@@ -1,0 +1,236 @@
+export enum UserRole {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  FRANCHISE_ADMIN = 'FRANCHISE_ADMIN',
+  FACULTY = 'FACULTY',
+  STUDENT = 'STUDENT',
+  GUEST = 'GUEST'
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  franchiseId?: string; // If null, belongs to HQ
+  avatarUrl?: string;
+  createdAt?: string;
+  phone?: string;
+  address?: string;
+}
+
+export interface StudentProfile extends User {
+  rollNumber: string;
+  batchId: string;
+  courseId: string;
+  admissionDate: string;
+  status: 'Active' | 'Inactive' | 'Graduated' | 'Suspended' | 'Pending';
+  attendancePercentage: number;
+  feesPaid: number;
+  totalFees: number;
+  guardianName?: string;
+  aadhaarNumber?: string;
+}
+
+export interface Course {
+  id: string;
+  title: string;
+  slug: string;
+  category: string;
+  duration: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  description: string;
+  learningOutcomes: string[];
+  price: number;
+  thumbnail: string;
+  status: 'Active' | 'Archived';
+}
+
+export interface Franchise {
+  id: string;
+  name: string;
+  location: string;
+  adminId: string;
+  adminName: string;
+  status: 'Active' | 'Pending' | 'Suspended';
+  studentCount: number;
+  revenue: number;
+  joinedDate: string;
+}
+
+export interface Batch {
+  id: string;
+  name: string; // e.g., "WD-2023-A"
+  courseId: string;
+  franchiseId: string;
+  facultyId: string;
+  schedule: string; // e.g., "Mon, Wed, Fri - 10:00 AM"
+  startDate: string;
+  studentCount: number;
+}
+
+export interface StudyMaterial {
+  id: string;
+  title: string;
+  type: 'PDF' | 'Video' | 'Assignment' | 'Link';
+  url: string;
+  courseId: string;
+  batchId?: string; // Optional: restrict to specific batch
+  uploadedBy: string; // Faculty Name
+  uploadDate: string;
+}
+
+export interface Assignment {
+  id: string;
+  title: string;
+  description: string;
+  dueDate: string;
+  batchId: string;
+  courseId: string;
+  totalMarks: number;
+}
+
+export interface AssignmentSubmission {
+  id: string;
+  assignmentId: string;
+  studentId: string;
+  submissionDate: string;
+  fileUrl: string;
+  status: 'Pending' | 'Submitted' | 'Graded';
+  marksObtained?: number;
+  feedback?: string;
+}
+
+export interface FeeTransaction {
+  id: string;
+  studentId: string;
+  amount: number;
+  date: string;
+  type: 'Tuition' | 'Exam' | 'Late Fee';
+  status: 'Paid' | 'Pending' | 'Failed';
+  invoiceUrl?: string;
+}
+
+export interface Certificate {
+  id: string;
+  studentId: string;
+  studentName: string;
+  courseId: string;
+  courseName: string;
+  issueDate: string;
+  validUntil?: string;
+  qrCodeUrl: string;
+  status: 'Valid' | 'Revoked' | 'Expired';
+  generatedBy: string; // Admin ID
+}
+
+export interface AttendanceRecord {
+  id: string;
+  date: string;
+  batchId: string;
+  studentId: string;
+  studentName: string;
+  status: 'Present' | 'Absent' | 'Late';
+  markedBy: string;
+}
+
+
+export interface StudentEnquiry {
+  id: string;
+  student_name: string;
+  mobile: string;
+  email: string;
+  course_interest?: string;
+  address?: string;
+  message?: string;
+  source: string;
+  status: 'New' | 'Contacted' | 'Converted' | 'Closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FranchiseEnquiry {
+  id: string;
+  full_name: string;
+  mobile: string;
+  email: string;
+  city?: string;
+  state?: string;
+  business_experience?: string;
+  investment_budget?: string;
+  location_interest?: string;
+  message?: string;
+  source: string;
+  status: 'New' | 'Contacted' | 'Approved' | 'Pending' | 'Closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EnquiryAnalytics {
+  student: {
+    total: number;
+    today: number;
+    converted: number;
+  };
+  franchise: {
+    total: number;
+    approved: number;
+    pending: number;
+  };
+}
+
+export interface CMSContent {
+  id: string;
+  section: 'Home_Hero' | 'About_Vision' | 'Contact_Info';
+  content: Record<string, string>; // Flexible JSON structure
+  lastUpdated: string;
+}
+
+export interface KPI {
+  label: string;
+  value: string | number;
+  change?: string;
+  icon?: string;
+  color?: string;
+}
+
+export interface ArchiveStudent {
+  id: string;
+  studentName: string;
+  fatherName?: string;
+  motherName?: string;
+  mobileNumber?: string;
+  enrollmentNumber?: string;
+  certificateId: string;
+  courseName?: string;
+  batch?: string;
+  session?: string;
+  admissionDate?: string;
+  completionDate?: string;
+  grade?: string;
+  resultStatus?: 'Pass' | 'Fail' | 'Distinction';
+  remarks?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface VerificationLogEntry {
+  id: string;
+  certificateId: string;
+  searchedAt: string;
+  found: boolean;
+  source: 'active' | 'archive' | 'not_found';
+}
+
+export interface ArchiveStats {
+  totalArchived: number;
+  totalVerifications: number;
+  recentSearches: number;
+  courseCounts: { _id: string; count: number }[];
+}
+
+export interface BulkImportReport {
+  total: number;
+  imported: number;
+  skipped: number;
+  errors: { row: number; message: string }[];
+}
