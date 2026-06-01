@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const { generatePassword, generateStudentUsername, generateFacultyUsername, generateFranchiseUsername, generateEmployeeCode } = require('./utils/credentials');
 
 require('dotenv').config();
@@ -33,6 +35,7 @@ const Fee = require('./models/Fee');
 const Attendance = require('./models/Attendance');
 const Notification = require('./models/Notification'); // Added newly
 const StudyMaterial = require('./models/StudyMaterial'); // Added newly
+const PasswordResetOTP = require('./models/PasswordResetOTP');
 const XLSX = require('xlsx');
 
 const app = express();
@@ -95,6 +98,27 @@ const seedData = async () => {
 };
 // Seed initialization moved to bottom
 
+// --- MIDDLEWARE ---
+const requireAuth = (req, res, next) => {
+  let token = req.headers.authorization;
+  if (!token || !token.startsWith('Bearer ')) return res.status(401).json({ message: 'No token provided' });
+  try {
+    token = token.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'gyanastu_super_secret_key_2024!!');
+    req.user = decoded; // { id, role, franchiseId }
+    next();
+  } catch (err) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+};
+
+const requireRole = (roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    return res.status(403).json({ message: 'Access Denied: Insufficient permissions' });
+  }
+  next();
+};
+
 // --- API ROUTES ---
 
 // 1. Authentication
@@ -156,6 +180,95 @@ app.get('/api/auth/me', async (req, res) => {
       res.json({ user });
     } catch (err) { res.status(401).json({ message: 'Not authorized' }); }
   } else res.status(401).json({ message: 'No token' });
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const { username } = req.body;
+  try {
+    const user = await User.findOne({ $or: [{ email: username }, { username: username }] });
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user.email) return res.status(400).json({ message: 'No email associated with this account' });
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + 10); // 10 mins expiry
+
+    await PasswordResetOTP.create({
+      user_id: user._id,
+      username: user.username || user.email,
+      email: user.email,
+      otp,
+      expires_at: expiresAt
+    });
+
+    // Send email
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: process.env.SMTP_PORT || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to: user.email,
+      subject: 'Password Reset OTP - Gyanastu ERP',
+      text: `Your OTP for password reset is: ${otp}. It will expire in 10 minutes.`
+    };
+
+    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+      await transporter.sendMail(mailOptions);
+    } else {
+      console.log(`[DEV MODE] OTP for ${user.email} is: ${otp}`);
+    }
+
+    // Mask email for response
+    const emailParts = user.email.split('@');
+    const maskedEmail = emailParts[0].charAt(0) + '*'.repeat(emailParts[0].length - 1) + '@' + emailParts[1];
+
+    res.json({ message: 'OTP sent successfully', maskedEmail });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/auth/verify-otp', async (req, res) => {
+  const { username, otp } = req.body;
+  try {
+    const record = await PasswordResetOTP.findOne({ username, otp, used: false }).sort({ createdAt: -1 });
+    if (!record) return res.status(400).json({ message: 'Invalid or expired OTP' });
+    if (new Date() > record.expires_at) return res.status(400).json({ message: 'OTP has expired' });
+
+    res.json({ message: 'OTP verified successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const { username, otp, newPassword } = req.body;
+  try {
+    const record = await PasswordResetOTP.findOne({ username, otp, used: false }).sort({ createdAt: -1 });
+    if (!record) return res.status(400).json({ message: 'Invalid or expired OTP' });
+    if (new Date() > record.expires_at) return res.status(400).json({ message: 'OTP has expired' });
+
+    const user = await User.findById(record.user_id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+
+    record.used = true;
+    await record.save();
+
+    res.json({ message: 'Password reset successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // 2. Dashboard Stats
@@ -228,7 +341,7 @@ const uploadStudentPhoto = multer({ storage: studentPhotoStorage });
 
 app.post('/api/students', uploadStudentPhoto.single('studentPhoto'), async (req, res) => {
   try {
-    const { name, email, franchiseId, courseId, totalFees, address, phone, guardianName, aadhaarNumber, franchiseName, bloodGroup } = req.body;
+    const { name, email, franchiseId, courseId, batchId, totalFees, address, phone, guardianName, aadhaarNumber, franchiseName, bloodGroup } = req.body;
     if (await User.findOne({ email })) return res.status(400).json({ message: 'User with this email already exists' });
 
     let finalFranchiseId = franchiseId;
@@ -251,7 +364,7 @@ app.post('/api/students', uploadStudentPhoto.single('studentPhoto'), async (req,
     }
 
     const newUser = await User.create({ name, email, username, password: hashedPassword, role: 'STUDENT', phone, address, avatarUrl, referenceModel: 'Student' });
-    const newStudent = await Student.create({ user: newUser._id, franchise: finalFranchiseId, course: courseId, totalFees: totalFees || 0, status: 'Pending', guardianName, aadhaarNumber, bloodGroup });
+    const newStudent = await Student.create({ user: newUser._id, franchise: finalFranchiseId, course: courseId, batch: batchId, totalFees: totalFees || 0, status: 'Pending', guardianName, aadhaarNumber, bloodGroup });
 
     newUser.referenceId = newStudent._id;
     await newUser.save();
@@ -264,11 +377,12 @@ app.post('/api/students', uploadStudentPhoto.single('studentPhoto'), async (req,
 
 app.put('/api/students/:id', async (req, res) => {
   try {
-    const { status, rollNumber, feesPaid } = req.body;
+    const { status, rollNumber, feesPaid, batchId } = req.body;
     const updateData = {};
     if (status) updateData.status = status;
     if (rollNumber) updateData.rollNumber = rollNumber;
     if (feesPaid !== undefined) updateData.feesPaid = feesPaid;
+    if (batchId !== undefined) updateData.batch = batchId;
 
     const student = await Student.findOneAndUpdate({ user: req.params.id }, updateData, { new: true });
 
@@ -407,30 +521,102 @@ app.delete('/api/courses/:id', async (req, res) => {
 });
 
 // 6. Batches CRUD
-app.get('/api/batches', async (req, res) => {
-  const { facultyId } = req.query;
-  const batches = await Batch.find(facultyId ? { faculty: facultyId } : {}).populate('course').populate('franchise');
-  res.json(batches.map(b => ({ id: b._id, name: b.name, courseId: b.course?._id, franchiseId: b.franchise?._id, facultyId: b.faculty, schedule: b.schedule, startDate: b.startDate, studentCount: b.currentStudents })));
-});
-app.post('/api/batches', async (req, res) => {
+app.get('/api/batches', requireAuth, async (req, res) => {
   try {
-    const batch = await Batch.create(req.body);
+    const { franchiseId, facultyId } = req.query;
+    let query = {};
+    
+    if (req.user.role === 'FRANCHISE_ADMIN') {
+      query.franchise = req.user.franchiseId;
+    } else if (req.user.role === 'FACULTY') {
+      // Faculty only see batches assigned to them or within their franchise
+      if (req.user.franchiseId) query.franchise = req.user.franchiseId;
+      if (facultyId) query.faculty = facultyId;
+    } else if (req.user.role === 'STUDENT') {
+      const student = await Student.findOne({ user: req.user.id });
+      if (student && student.batch) query._id = student.batch;
+    } else {
+      // Super Admin sees all, or filters by franchise
+      if (franchiseId) query.franchise = franchiseId;
+    }
+
+    const batches = await Batch.find(query)
+      .populate('course', 'title')
+      .populate('franchise', 'name')
+      .populate('faculty', 'name');
+
+    // Manually count students for each batch
+    const enriched = await Promise.all(batches.map(async (b) => {
+      const currentStudents = await Student.countDocuments({ batch: b._id });
+      return {
+        id: b._id,
+        batchName: b.batchName,
+        courseId: b.course?._id,
+        courseName: b.course?.title,
+        franchiseId: b.franchise?._id,
+        franchiseName: b.franchise?.name,
+        facultyId: b.faculty?._id,
+        facultyName: b.faculty?.name,
+        timing: b.timing,
+        startDate: b.startDate,
+        endDate: b.endDate,
+        capacity: b.capacity,
+        classroom: b.classroom,
+        remarks: b.remarks,
+        status: b.status,
+        currentStudents
+      };
+    }));
+    res.json(enriched);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.post('/api/batches', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
+  try {
+    const payload = { ...req.body, franchise: req.user.franchiseId };
+    const batch = await Batch.create(payload);
     broadcast('batch_added', batch);
-    res.json(batch);
+    res.status(201).json(batch);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.put('/api/batches/:id', async (req, res) => {
+
+app.put('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
   try {
-    const batch = await Batch.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    const batch = await Batch.findOneAndUpdate(
+      { _id: req.params.id, franchise: req.user.franchiseId },
+      req.body,
+      { new: true }
+    );
+    if (!batch) return res.status(404).json({ message: 'Batch not found or access denied' });
     broadcast('batch_updated', batch);
     res.json(batch);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.delete('/api/batches/:id', async (req, res) => {
+
+app.delete('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
   try {
-    await Batch.findByIdAndDelete(req.params.id);
+    const batch = await Batch.findOneAndDelete({ _id: req.params.id, franchise: req.user.franchiseId });
+    if (!batch) return res.status(404).json({ message: 'Batch not found or access denied' });
+    
+    // Unassign students from this batch
+    await Student.updateMany({ batch: req.params.id }, { batch: null });
+    
     broadcast('batch_deleted', req.params.id);
     res.json({ message: 'Deleted' });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.get('/api/batches/:id/students', requireAuth, async (req, res) => {
+  try {
+    const students = await Student.find({ batch: req.params.id }).populate('user', 'name phone');
+    res.json(students.map(s => ({
+      studentId: s.user._id, // User ID is used as studentId in frontend in some places
+      studentRecordId: s._id, // Actual Student ID
+      name: s.user.name,
+      phone: s.user.phone,
+      admissionDate: s.admissionDate,
+      attendancePercentage: s.attendancePercentage
+    })));
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
@@ -508,38 +694,168 @@ app.delete('/api/faculty/:id', async (req, res) => {
 });
 
 // 8. Attendance
-app.get('/api/attendance', async (req, res) => {
-  const { studentId, batchId, date } = req.query;
-  const query = {};
-  if (studentId) query.student = studentId;
-  if (batchId) query.batch = batchId;
-  if (date) {
-    const targetDate = new Date(date);
-    targetDate.setHours(0, 0, 0, 0);
-    const nextDate = new Date(targetDate);
-    nextDate.setDate(targetDate.getDate() + 1);
-    query.date = { $gte: targetDate, $lt: nextDate };
-  }
-  res.json(await Attendance.find(query).sort({ date: -1 }).populate('batch', 'name'));
-});
-app.post('/api/attendance', async (req, res) => {
+app.get('/api/attendance', requireAuth, async (req, res) => {
   try {
-    const { batchId, date, records, markedBy } = req.body;
+    const { studentId, batchId, date, startDate, endDate } = req.query;
+    const query = {};
+    
+    // Security check: Student can only view their own
+    if (req.user.role === 'STUDENT') {
+      const student = await Student.findOne({ user: req.user.id });
+      if (!student) return res.status(403).json({ message: 'Student record not found' });
+      query.student = student._id;
+    } else if (studentId) {
+      // Find internal student _id
+      const st = await Student.findOne({ user: studentId });
+      if (st) query.student = st._id;
+    }
+
+    if (batchId) query.batch = batchId;
+    
+    if (date) {
+      const targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+      const nextDate = new Date(targetDate);
+      nextDate.setDate(targetDate.getDate() + 1);
+      query.date = { $gte: targetDate, $lt: nextDate };
+    } else if (startDate && endDate) {
+      const sd = new Date(startDate); sd.setHours(0,0,0,0);
+      const ed = new Date(endDate); ed.setHours(23,59,59,999);
+      query.date = { $gte: sd, $lte: ed };
+    }
+
+    const records = await Attendance.find(query).sort({ date: -1 }).populate('batch', 'batchName').populate({ path: 'student', populate: { path: 'user', select: 'name' } });
+    res.json(records.map(r => ({
+      id: r._id,
+      studentId: r.student.user._id,
+      studentName: r.student.user.name,
+      batchId: r.batch._id,
+      batchName: r.batch.batchName,
+      date: r.date,
+      status: r.status,
+      remarks: r.remarks
+    })));
+  } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.post('/api/attendance', requireAuth, requireRole(['FRANCHISE_ADMIN', 'FACULTY']), async (req, res) => {
+  try {
+    const { batchId, date, records } = req.body;
+    
+    // Check if the user has access to this batch
+    const batch = await Batch.findById(batchId);
+    if (!batch) return res.status(404).json({ message: 'Batch not found' });
+    if (req.user.role === 'FRANCHISE_ADMIN' && batch.franchise.toString() !== req.user.franchiseId) {
+      return res.status(403).json({ message: 'Access Denied' });
+    }
+    
+    const targetDate = new Date(date);
+    targetDate.setHours(0,0,0,0);
+
     const promises = records.map(async (rec) => {
+      // Find actual Student document via User ID (rec.studentId)
       const studentDoc = await Student.findOne({ user: rec.studentId });
       if (!studentDoc) return;
-      return Attendance.updateOne(
-        { student: studentDoc._id, batch: batchId, date: new Date(date) },
-        { status: rec.status, markedBy, isLocked: true }, { upsert: true }
+      return Attendance.findOneAndUpdate(
+        { student: studentDoc._id, batch: batchId, date: targetDate },
+        { status: rec.status, remarks: rec.remarks, markedBy: req.user.id }, 
+        { upsert: true, new: true }
       );
     });
     await Promise.all(promises);
 
-    // Broadcast via socket
-    broadcast('attendance_marked', { batchId, date });
+    // Recalculate attendance % for all these students
+    for (const rec of records) {
+       const studentDoc = await Student.findOne({ user: rec.studentId });
+       if (studentDoc) {
+          const totalDays = await Attendance.countDocuments({ student: studentDoc._id });
+          const presentDays = await Attendance.countDocuments({ student: studentDoc._id, status: 'Present' });
+          const pct = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+          studentDoc.attendancePercentage = parseFloat(pct.toFixed(2));
+          await studentDoc.save();
+       }
+    }
 
+    broadcast('attendance_marked', { batchId, date });
     res.status(201).json({ message: 'Attendance marked successfully' });
   } catch (err) { res.status(500).json({ message: err.message }); }
+});
+
+app.get('/api/attendance/reports/student', requireAuth, async (req, res) => {
+  try {
+    const { franchiseId } = req.query;
+    let studentQuery = {};
+    
+    if (req.user.role === 'FRANCHISE_ADMIN') {
+      studentQuery.franchise = req.user.franchiseId;
+    } else if (req.user.role === 'SUPER_ADMIN' && franchiseId) {
+      studentQuery.franchise = franchiseId;
+    }
+
+    const students = await Student.find(studentQuery).populate('user', 'name').populate('batch', 'batchName');
+    
+    const report = await Promise.all(students.map(async (s) => {
+      const total = await Attendance.countDocuments({ student: s._id });
+      const present = await Attendance.countDocuments({ student: s._id, status: 'Present' });
+      const absent = await Attendance.countDocuments({ student: s._id, status: 'Absent' });
+      const late = await Attendance.countDocuments({ student: s._id, status: 'Late' });
+      const leave = await Attendance.countDocuments({ student: s._id, status: 'Leave' });
+      
+      return {
+        studentId: s.user._id,
+        studentName: s.user.name,
+        batchName: s.batch ? s.batch.batchName : 'Unassigned',
+        totalDays: total,
+        presentDays: present,
+        absentDays: absent,
+        lateDays: late,
+        leaveDays: leave,
+        attendancePercentage: s.attendancePercentage
+      };
+    }));
+    
+    res.json(report);
+  } catch(err) { res.status(500).json({ message: err.message }); }
+});
+
+app.get('/api/attendance/reports/batch', requireAuth, async (req, res) => {
+  try {
+    const { franchiseId } = req.query;
+    let batchQuery = {};
+    if (req.user.role === 'FRANCHISE_ADMIN') {
+      batchQuery.franchise = req.user.franchiseId;
+    } else if (req.user.role === 'SUPER_ADMIN' && franchiseId) {
+      batchQuery.franchise = franchiseId;
+    }
+
+    const batches = await Batch.find(batchQuery);
+    const report = await Promise.all(batches.map(async (b) => {
+      const studentCount = await Student.countDocuments({ batch: b._id });
+      
+      // Today's attendance
+      const today = new Date();
+      today.setHours(0,0,0,0);
+      const nextDate = new Date(today);
+      nextDate.setDate(today.getDate() + 1);
+      
+      const todayRecords = await Attendance.find({ batch: b._id, date: { $gte: today, $lt: nextDate } });
+      const presentToday = todayRecords.filter(r => r.status === 'Present').length;
+      
+      // Monthly average approx (just calculating all time average for simplicity, can be refined)
+      const allRecords = await Attendance.find({ batch: b._id });
+      const totalP = allRecords.filter(r => r.status === 'Present').length;
+      const averagePct = allRecords.length > 0 ? (totalP / allRecords.length) * 100 : 0;
+
+      return {
+        batchId: b._id,
+        batchName: b.batchName,
+        totalStudents: studentCount,
+        presentToday,
+        averageAttendance: parseFloat(averagePct.toFixed(2))
+      };
+    }));
+    res.json(report);
+  } catch(err) { res.status(500).json({ message: err.message }); }
 });
 
 // 9. Study Materials

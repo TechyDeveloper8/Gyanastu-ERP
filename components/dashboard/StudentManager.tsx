@@ -13,6 +13,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
   const [students, setStudents] = useState<StudentProfile[]>([]);
   const [courses, setCourses] = useState<any[]>([]);
   const [franchises, setFranchises] = useState<any[]>([]);
+  const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,17 +21,18 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
   const [newCredentials, setNewCredentials] = useState<{ username: string, password: string } | null>(null);
 
   const [newStudent, setNewStudent] = useState({
-    name: '', email: '', courseId: '', feesTotal: '', phone: '', address: '', guardianName: '', aadhaarNumber: '', franchiseName: '', bloodGroup: ''
+    name: '', email: '', courseId: '', batchId: '', feesTotal: '', phone: '', address: '', guardianName: '', aadhaarNumber: '', franchiseName: '', bloodGroup: ''
   });
   const [studentPhoto, setStudentPhoto] = useState<File | null>(null);
 
   const fetchStudentsAndCourses = async () => {
     try {
       setLoading(true);
-      const [resStudents, resCourses, resFranchises]: any = await Promise.all([
+      const [resStudents, resCourses, resFranchises, resBatches]: any = await Promise.all([
         api.getStudents(franchiseId),
         api.getCourses(),
-        userRole === UserRole.SUPER_ADMIN ? api.getFranchises() : Promise.resolve([])
+        userRole === UserRole.SUPER_ADMIN ? api.getFranchises() : Promise.resolve([]),
+        api.getBatches(franchiseId)
       ]);
       setStudents(Array.isArray(resStudents) ? resStudents : resStudents.data || []);
 
@@ -39,6 +41,9 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
       
       const franchiseList = Array.isArray(resFranchises) ? resFranchises : resFranchises.data || [];
       setFranchises(franchiseList);
+      
+      const batchList = Array.isArray(resBatches) ? resBatches : [];
+      setBatches(batchList);
       
       if (courseList.length > 0 && !newStudent.courseId) {
         setNewStudent(prev => ({ ...prev, courseId: courseList[0]._id || courseList[0].id }));
@@ -81,6 +86,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
       formData.append('name', newStudent.name);
       formData.append('email', newStudent.email);
       formData.append('courseId', newStudent.courseId);
+      if (newStudent.batchId) formData.append('batchId', newStudent.batchId);
       formData.append('totalFees', newStudent.feesTotal.toString());
       formData.append('phone', newStudent.phone);
       formData.append('address', newStudent.address);
@@ -99,7 +105,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
       } else {
         setIsAddModalOpen(false);
       }
-      setNewStudent({ name: '', email: '', courseId: courses.length > 0 ? (courses[0]._id || courses[0].id) : '', feesTotal: 45000, phone: '', address: '', guardianName: '', aadhaarNumber: '', franchiseName: '', bloodGroup: '' });
+      setNewStudent({ name: '', email: '', courseId: courses.length > 0 ? (courses[0]._id || courses[0].id) : '', batchId: '', feesTotal: 45000, phone: '', address: '', guardianName: '', aadhaarNumber: '', franchiseName: '', bloodGroup: '' });
       setStudentPhoto(null);
     } catch (err: any) { alert(err.message || 'Failed to create student'); }
   };
@@ -245,7 +251,22 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
                       </div>
                     </div>
                   ) : (
-                    <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total Fee (₹)</label><input type="number" className="w-full border border-gray-200 rounded-lg px-4 py-2" value={newStudent.feesTotal} onChange={e => setNewStudent({ ...newStudent, feesTotal: parseInt(e.target.value) })} /></div>
+                    <div className="space-y-4">
+                      <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Total Fee (₹)</label><input type="number" className="w-full border border-gray-200 rounded-lg px-4 py-2" value={newStudent.feesTotal} onChange={e => setNewStudent({ ...newStudent, feesTotal: parseInt(e.target.value) })} /></div>
+                      <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Assigned Batch (Optional)</label>
+                        <select
+                          className="w-full border border-gray-200 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/20"
+                          value={newStudent.batchId}
+                          onChange={e => setNewStudent({ ...newStudent, batchId: e.target.value })}
+                        >
+                          <option value="">Select Batch later</option>
+                          {batches.filter(b => b.courseId === newStudent.courseId && b.status !== 'Completed').map((b: any) => (
+                            <option key={b.id} value={b.id}>{b.batchName} ({b.timing})</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   )}
                 </div>
 

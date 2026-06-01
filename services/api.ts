@@ -46,6 +46,9 @@ export const api = {
   // Auth
   login: (credentials: any) => request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) }),
   changePassword: (data: any) => request('/auth/change-password', { method: 'POST', body: JSON.stringify(data) }),
+  forgotPassword: (data: { username: string }) => request('/auth/forgot-password', { method: 'POST', body: JSON.stringify(data) }),
+  verifyOTP: (data: { username: string, otp: string }) => request('/auth/verify-otp', { method: 'POST', body: JSON.stringify(data) }),
+  resetPassword: (data: { username: string, otp: string, newPassword: string }) => request('/auth/reset-password', { method: 'POST', body: JSON.stringify(data) }),
   getProfile: () => request('/auth/me'),
   
   // Dashboard
@@ -72,7 +75,13 @@ export const api = {
   deleteCourse: (id: string) => request(`/courses/${id}`, { method: 'DELETE' }),
   
   // Batches
-  getBatches: (facultyId?: string) => request(`/batches${facultyId ? `?facultyId=${facultyId}` : ''}`),
+  getBatches: (franchiseId?: string, facultyId?: string) => {
+    const params = new URLSearchParams();
+    if (franchiseId) params.append('franchiseId', franchiseId);
+    if (facultyId) params.append('facultyId', facultyId);
+    return request(`/batches?${params.toString()}`);
+  },
+  getBatchStudents: (id: string) => request(`/batches/${id}/students`),
   createBatch: (data: any) => request(`/batches`, { method: 'POST', body: JSON.stringify(data) }),
   updateBatch: (id: string, data: any) => request(`/batches/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteBatch: (id: string) => request(`/batches/${id}`, { method: 'DELETE' }),
@@ -83,18 +92,22 @@ export const api = {
   deleteFaculty: (id: string) => request(`/faculty/${id}`, { method: 'DELETE' }),
   
   // Attendance
-  getAttendance: (params?: { studentId?: string, batchId?: string, date?: string }) => {
+  getAttendance: (params?: { studentId?: string, batchId?: string, date?: string, startDate?: string, endDate?: string }) => {
     let query = '';
     if (params) {
       const q = new URLSearchParams();
       if (params.studentId) q.append('studentId', params.studentId);
       if (params.batchId) q.append('batchId', params.batchId);
       if (params.date) q.append('date', params.date);
+      if (params.startDate) q.append('startDate', params.startDate);
+      if (params.endDate) q.append('endDate', params.endDate);
       query = q.toString() ? `?${q.toString()}` : '';
     }
     return request(`/attendance${query}`);
   },
-  markAttendance: (data: { batchId: string, date: string, records: any[], markedBy: string }) => request('/attendance', { method: 'POST', body: JSON.stringify(data) }),
+  markAttendance: (data: { batchId: string, date: string, records: any[] }) => request('/attendance', { method: 'POST', body: JSON.stringify(data) }),
+  getStudentAttendanceReport: (franchiseId?: string) => request(`/attendance/reports/student${franchiseId ? `?franchiseId=${franchiseId}` : ''}`),
+  getBatchAttendanceReport: (franchiseId?: string) => request(`/attendance/reports/batch${franchiseId ? `?franchiseId=${franchiseId}` : ''}`),
   
   // Fees
   getFees: (studentId?: string) => request(`/fees${studentId ? `?studentId=${studentId}` : ''}`),

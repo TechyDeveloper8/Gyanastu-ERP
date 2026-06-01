@@ -13,6 +13,7 @@ const About = lazy(() => import('./pages/About'));
 const Franchise = lazy(() => import('./pages/Franchise'));
 const Contact = lazy(() => import('./pages/Contact'));
 const Verification = lazy(() => import('./pages/Verification'));
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'));
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function App() {
               <Route path="/contact" element={<Contact />} />
               <Route path="/verify" element={<Verification />} />
               <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -35,5 +35,17 @@ export const authService = {
   getUserProfile: async (): Promise<User> => {
     const response: any = await api.getProfile();
     return response.user;
+  },
+
+  forgotPassword: async (username: string): Promise<any> => {
+    return await api.forgotPassword({ username });
+  },
+
+  verifyOTP: async (username: string, otp: string): Promise<any> => {
+    return await api.verifyOTP({ username, otp });
+  },
+
+  resetPassword: async (username: string, otp: string, newPassword: string): Promise<any> => {
+    return await api.resetPassword({ username, otp, newPassword });
   }
 };

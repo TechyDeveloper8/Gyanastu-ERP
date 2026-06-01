@@ -59,13 +59,20 @@ export interface Franchise {
 
 export interface Batch {
   id: string;
-  name: string; // e.g., "WD-2023-A"
+  batchName: string;
   courseId: string;
+  courseName?: string;
   franchiseId: string;
   facultyId: string;
-  schedule: string; // e.g., "Mon, Wed, Fri - 10:00 AM"
+  facultyName?: string;
+  timing: string; 
   startDate: string;
-  studentCount: number;
+  endDate?: string;
+  capacity: number;
+  classroom?: string;
+  remarks?: string;
+  status: 'Upcoming' | 'Active' | 'Completed';
+  currentStudents: number;
 }
 
 export interface StudyMaterial {
@@ -127,10 +134,12 @@ export interface AttendanceRecord {
   id: string;
   date: string;
   batchId: string;
+  batchName?: string;
   studentId: string;
   studentName: string;
-  status: 'Present' | 'Absent' | 'Late';
-  markedBy: string;
+  status: 'Present' | 'Absent' | 'Late' | 'Leave';
+  remarks?: string;
+  markedBy?: string;
 }
 
 

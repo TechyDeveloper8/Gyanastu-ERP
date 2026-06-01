@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { LogIn, BookOpen, AlertCircle, Shield, Briefcase, GraduationCap, Users } from 'lucide-react';
@@ -136,7 +136,7 @@ const Login: React.FC = () => {
                 </div>
 
                 <div className="flex justify-end">
-                  <a href="#" className="text-xs font-bold text-accent hover:underline">Forgot Password?</a>
+                  <Link to="/forgot-password" className="text-xs font-bold text-accent hover:underline">Forgot Password?</Link>
                 </div>
               </>
             ) : (

@@ -2,17 +2,18 @@
 const mongoose = require('mongoose');
 
 const batchSchema = mongoose.Schema({
-  name: { type: String, required: true }, // e.g. WD-2023-A
+  batchName: { type: String, required: true }, 
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
-  faculty: { type: mongoose.Schema.Types.ObjectId, ref: 'Faculty' },
-  franchise: { type: mongoose.Schema.Types.ObjectId, ref: 'Franchise' },
+  faculty: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Reference User model since Faculty are Users
+  franchise: { type: mongoose.Schema.Types.ObjectId, ref: 'Franchise', required: true }, // Required for franchise ownership
   
-  schedule: { type: String }, // e.g. "Mon, Wed, Fri - 10:00 AM"
+  timing: { type: String }, 
   startDate: { type: Date },
   endDate: { type: Date },
   
-  maxStudents: { type: Number, default: 30 },
-  currentStudents: { type: Number, default: 0 },
+  capacity: { type: Number, default: 30 },
+  classroom: { type: String },
+  remarks: { type: String },
   
   status: { type: String, enum: ['Upcoming', 'Active', 'Completed'], default: 'Active' }
 }, {

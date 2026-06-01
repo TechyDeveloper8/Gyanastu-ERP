@@ -22,6 +22,9 @@ import FacultyOverview from '../components/dashboard/FacultyOverview';
 import AttendanceManager from '../components/dashboard/AttendanceManager';
 import StudyMaterialManager from '../components/dashboard/StudyMaterialManager';
 import MyBatches from '../components/dashboard/MyBatches';
+import BatchManager from '../components/dashboard/BatchManager';
+import BatchAllocation from '../components/dashboard/BatchAllocation';
+import AttendanceReports from '../components/dashboard/AttendanceReports';
 import StudentOverview from '../components/dashboard/StudentOverview';
 import StudentCourseView from '../components/dashboard/StudentCourseView';
 import StudentAttendanceView from '../components/dashboard/StudentAttendanceView';
@@ -166,6 +169,9 @@ const Dashboard: React.FC = () => {
       case 'enquiries-franchise': return user.role === UserRole.SUPER_ADMIN ? <FranchiseEnquiryManager /> : <div>Access Denied</div>;
       case 'enquiries-analytics': return user.role === UserRole.SUPER_ADMIN ? <EnquiryAnalytics /> : <div>Access Denied</div>;
       case 'reports': return <ReportsAnalytics />;
+      case 'batches': return user.role === UserRole.FRANCHISE_ADMIN ? <BatchManager /> : <div>Access Denied</div>;
+      case 'batch-allocation': return user.role === UserRole.FRANCHISE_ADMIN ? <BatchAllocation /> : <div>Access Denied</div>;
+      case 'attendance-reports': return <AttendanceReports />;
       case 'attendance': return <AttendanceManager />;
       case 'materials': return <StudyMaterialManager />;
       case 'my-batches': return <MyBatches />;
@@ -199,6 +205,7 @@ const Dashboard: React.FC = () => {
       { id: 'faculty', label: 'Faculty', icon: <Briefcase /> },
       { id: 'certificates', label: 'Certificates', icon: <Award /> },
       { id: 'reports', label: 'Reports', icon: <PieChart /> },
+      { id: 'attendance-reports', label: 'Attendance Reports', icon: <Calendar /> },
       { id: 'cms', label: 'Website CMS', icon: <Globe /> },
       { id: 'divider-archive', label: 'OLD STUDENT RECORDS', icon: null, isDivider: true },
       { id: 'archive-list', label: 'Student Archive', icon: <Archive /> },
@@ -211,6 +218,11 @@ const Dashboard: React.FC = () => {
       { id: 'students', label: 'My Students', icon: <Users /> },
       { id: 'faculty', label: 'My Faculty', icon: <Briefcase /> },
       { id: 'fees', label: 'Fee Management', icon: <DollarSign /> },
+      { id: 'divider-academic', label: 'ACADEMIC MANAGEMENT', icon: null, isDivider: true },
+      { id: 'batches', label: 'Batch Management', icon: <Book /> },
+      { id: 'batch-allocation', label: 'Student Batch Allocation', icon: <Users /> },
+      { id: 'attendance', label: 'Attendance Management', icon: <Calendar /> },
+      { id: 'attendance-reports', label: 'Attendance Reports', icon: <PieChart /> },
       ];
     }
     if (user.role === UserRole.FACULTY) {

@@ -6,8 +6,9 @@ const attendanceSchema = mongoose.Schema({
   batch: { type: mongoose.Schema.Types.ObjectId, ref: 'Batch', required: true },
   date: { type: Date, required: true },
   
-  status: { type: String, enum: ['Present', 'Absent', 'Late'], required: true },
-  markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Faculty User ID
+  status: { type: String, enum: ['Present', 'Absent', 'Late', 'Leave'], required: true },
+  markedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Faculty or Franchise Admin User ID
+  remarks: { type: String },
   isLocked: { type: Boolean, default: false }
 }, {
   timestamps: true
