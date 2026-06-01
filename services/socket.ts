@@ -1,8 +1,10 @@
 import { io } from 'socket.io-client';
 
-// Automatically connects to window.location.origin
-// Vite dev server proxies /socket.io to backend on port 5000
-export const socket = io({
+// Automatically connects to window.location.origin in dev
+// In production, Vercel cannot proxy WebSockets, so we connect directly to Render
+const backendUrl = import.meta.env.PROD ? 'https://gyanastu-erp.onrender.com' : undefined;
+
+export const socket = io(backendUrl, {
   transports: ['websocket', 'polling']
 });
 

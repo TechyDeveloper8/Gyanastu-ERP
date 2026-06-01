@@ -413,10 +413,23 @@ app.put('/api/students/:id', async (req, res) => {
 
 app.delete('/api/students/:id', async (req, res) => {
   try {
-    const student = await Student.findOneAndDelete({ user: req.params.id });
-    if (student) await User.findByIdAndDelete(req.params.id);
+    const student = await Student.findOne({ user: req.params.id });
+    if (student) {
+      // Delete related records
+      await Attendance.deleteMany({ student: student._id });
+      await Fee.deleteMany({ student: student._id });
+      await Certificate.deleteMany({ studentId: req.params.id }); // Note: Certificate might store user ID as string in studentId
+      
+      // Delete the student record
+      await Student.findByIdAndDelete(student._id);
+    }
+    
+    // Delete the user record and OTPs
+    await User.findByIdAndDelete(req.params.id);
+    await PasswordResetOTP.deleteMany({ user_id: req.params.id });
+    
     broadcast('student_deleted', { userId: req.params.id });
-    res.json({ message: 'Deleted cleanly' });
+    res.json({ message: 'Deleted cleanly from all related databases' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
@@ -482,15 +495,31 @@ app.patch('/api/franchises/:id/status', async (req, res) => {
 });
 app.delete('/api/franchises/:id', async (req, res) => {
   try {
-    // Delete franchise
-    await Franchise.findByIdAndDelete(req.params.id);
-    // SAFELY HANDLE LINKED STUDENTS
+    const franchise = await Franchise.findById(req.params.id);
+    if (!franchise) return res.status(404).json({ message: 'Not found' });
+
+    // 1. Delete franchise admin user
+    if (franchise.adminId) {
+      await User.findByIdAndDelete(franchise.adminId);
+      await PasswordResetOTP.deleteMany({ user_id: franchise.adminId });
+    }
+
+    // 2. Handle linked faculties
+    const faculties = await Faculty.find({ franchise: req.params.id });
+    for (const fac of faculties) {
+      await User.findByIdAndDelete(fac.user);
+      await PasswordResetOTP.deleteMany({ user_id: fac.user });
+      await Faculty.findByIdAndDelete(fac._id);
+    }
+
+    // 3. Suspend students and remove franchise link
     await Student.updateMany({ franchise: req.params.id }, { status: 'Suspended', franchise: null });
-    // Remove related faculties
-    await Faculty.deleteMany({ franchise: req.params.id });
+
+    // 4. Delete the franchise
+    await Franchise.findByIdAndDelete(req.params.id);
 
     broadcast('franchise_deleted', req.params.id);
-    res.json({ message: 'Franchise and relations handled cleanly' });
+    res.json({ message: 'Franchise and all associated users deleted completely' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
@@ -686,10 +715,19 @@ app.post('/api/faculty', uploadFacultyPhoto.single('facultyPhoto'), async (req, 
 });
 app.delete('/api/faculty/:id', async (req, res) => {
   try {
-    await Faculty.findOneAndDelete({ user: req.params.id });
+    const faculty = await Faculty.findOne({ user: req.params.id });
+    if (faculty) {
+      // Unassign from batches
+      await Batch.updateMany({ faculty: req.params.id }, { faculty: null });
+      await Faculty.findByIdAndDelete(faculty._id);
+    }
+    
+    // Delete User and OTPs
     await User.findByIdAndDelete(req.params.id);
+    await PasswordResetOTP.deleteMany({ user_id: req.params.id });
+    
     broadcast('faculty_deleted', req.params.id);
-    res.json({ message: 'Deleted' });
+    res.json({ message: 'Faculty completely removed from database' });
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
