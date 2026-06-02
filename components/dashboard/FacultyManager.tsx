@@ -4,6 +4,7 @@ import { socket } from '../../services/socket';
 import { UserRole } from '../../types';
 import { Users, BookOpen, MoreHorizontal, ShieldCheck, Loader, XCircle, Trash2, CheckCircle, Camera, Briefcase } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import DeleteConfirmationModal from '../DeleteConfirmationModal';
 
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -15,6 +16,8 @@ const FacultyManager: React.FC = () => {
   const [batches, setBatches] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [facultyToDelete, setFacultyToDelete] = useState<string | null>(null);
   const [newCredentials, setNewCredentials] = useState<{ username: string, password: string, employeeCode: string } | null>(null);
 
   const [newFac, setNewFac] = useState({
@@ -66,10 +69,18 @@ const FacultyManager: React.FC = () => {
     };
   }, [user]);
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Delete this faculty member completely?')) {
-      try { await api.deleteFaculty(id); } catch (err) { alert('Failed to delete faculty'); }
-    }
+  const handleDeleteClick = (id: string) => {
+    setFacultyToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!facultyToDelete) return;
+    try { 
+      await api.deleteFaculty(facultyToDelete); 
+      setIsDeleteModalOpen(false);
+      setFacultyToDelete(null);
+    } catch (err) { alert('Failed to delete faculty'); }
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,7 +143,7 @@ const FacultyManager: React.FC = () => {
           <h2 className="text-2xl font-heading font-bold text-primary">Faculty Administration</h2>
           <p className="text-gray-500 text-sm">{user?.role === UserRole.SUPER_ADMIN ? "Assign teachers to franchises." : "View assigned faculty members for your institute."}</p>
         </div>
-        {(user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.FRANCHISE_ADMIN) && (
+        {(user?.role === UserRole.FRANCHISE_ADMIN) && (
           <button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-white px-4 py-2 rounded-lg font-bold hover:bg-primary/90 transition-colors">+ Add Faculty</button>
         )}
       </div>
@@ -146,7 +157,7 @@ const FacultyManager: React.FC = () => {
             return (
               <div key={fid} className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col items-center text-center relative group">
                 <button className="absolute top-4 right-4 text-gray-300 hover:text-primary"><MoreHorizontal className="w-5 h-5" /></button>
-                {user?.role === UserRole.SUPER_ADMIN && (<button onClick={() => handleDelete(fid)} className="absolute top-4 left-4 text-gray-300 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>)}
+                {user?.role === UserRole.SUPER_ADMIN && (<button onClick={() => handleDeleteClick(fid)} className="absolute top-4 left-4 text-gray-300 hover:text-red-500" title="Delete"><Trash2 className="w-4 h-4" /></button>)}
 
                 <div className="relative">
                   <div className="w-20 h-20 rounded-full bg-gray-100 mb-4 overflow-hidden border-2 border-white shadow-lg"><img src={f.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${f.name}`} alt={f.name} className="w-full h-full object-cover" /></div>
@@ -167,12 +178,19 @@ const FacultyManager: React.FC = () => {
             )
           }))}
 
-        {(user?.role === UserRole.SUPER_ADMIN || user?.role === UserRole.FRANCHISE_ADMIN) && (
+        {(user?.role === UserRole.FRANCHISE_ADMIN) && (
           <div onClick={() => setIsAddModalOpen(true)} className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center p-8 text-gray-400 hover:border-accent hover:text-accent transition-colors cursor-pointer">
             <Users className="w-12 h-12 mb-2" /><p className="font-bold">Assign New Faculty</p>
           </div>
         )}
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Faculty Record"
+      />
 
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

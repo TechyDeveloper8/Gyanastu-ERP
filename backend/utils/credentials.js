@@ -31,11 +31,26 @@ const generateFacultyUsername = async () => {
     return `FAC${sequence}`;
 };
 
-const generateFranchiseUsername = async (city = 'HQ') => {
-    const cityCode = city.substring(0, 3).toUpperCase();
+const generateFranchiseUsername = async () => {
     const count = await Franchise.countDocuments();
     const sequence = (count + 1).toString().padStart(3, '0');
-    return `FRN${cityCode}${sequence}`;
+    return `GYA-FR${sequence}`;
+};
+
+const generateFranchiseCode = async () => {
+    const year = new Date().getFullYear();
+    const count = await Franchise.countDocuments();
+    const sequence = (count + 1).toString().padStart(3, '0');
+    return `FR-${year}-${sequence}`;
+};
+
+const generateFranchisePassword = () => {
+    const numbers = '0123456789';
+    let password = 'GYA@';
+    for(let i=0; i<6; i++) {
+        password += numbers[Math.floor(Math.random() * numbers.length)];
+    }
+    return password;
 };
 
 const generateEmployeeCode = async () => {
@@ -50,5 +65,7 @@ module.exports = {
     generateStudentUsername,
     generateFacultyUsername,
     generateFranchiseUsername,
+    generateFranchiseCode,
+    generateFranchisePassword,
     generateEmployeeCode
 };

@@ -10,11 +10,6 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
-  const [userId, setUserId] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -24,29 +19,7 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      if (requirePasswordChange) {
-        if (newPassword !== confirmPassword) {
-          setError("Passwords don't match");
-          setLoading(false);
-          return;
-        }
-        if (newPassword.length < 6) {
-          setError("Password must be at least 6 characters");
-          setLoading(false);
-          return;
-        }
-        const user = await authService.changePassword(userId, password, newPassword);
-        login(user);
-        navigate('/dashboard');
-        return;
-      }
-
       const result = await authService.login(email, password);
-      if (result.requirePasswordChange) {
-        setRequirePasswordChange(true);
-        setUserId(result.userId);
-        return;
-      }
       login(result);
       navigate('/dashboard');
     } catch (err: any) {
@@ -96,9 +69,9 @@ const Login: React.FC = () => {
         {/* Right Side - Login Form */}
         <div className="p-10 md:w-1/2 flex flex-col justify-center bg-white">
           <div className="mb-8">
-             <h3 className="text-2xl font-bold text-gray-800">{requirePasswordChange ? 'Change Password' : 'Sign In'}</h3>
+             <h3 className="text-2xl font-bold text-gray-800">Sign In</h3>
              <p className="text-gray-500 text-sm">
-               {requirePasswordChange ? 'Please set a new password to continue.' : 'Enter your credentials to access your dashboard.'}
+               Enter your credentials to access your dashboard.
              </p>
           </div>
 
@@ -109,70 +82,40 @@ const Login: React.FC = () => {
               </div>
             )}
             
-            {!requirePasswordChange ? (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email or Username</label>
-                  <input 
-                    type="text" 
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="name@gyanastu.com or GYA2024..."
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Password</label>
-                  <input 
-                    type="password" 
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                  />
-                </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Email or Username</label>
+              <input 
+                type="text" 
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="name@gyanastu.com or GYA2024..."
+              />
+            </div>
+            
+            <div>
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Password</label>
+              <input 
+                type="password" 
+                required
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+              />
+            </div>
 
-                <div className="flex justify-end">
-                  <Link to="/forgot-password" className="text-xs font-bold text-accent hover:underline">Forgot Password?</Link>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">New Password</label>
-                  <input 
-                    type="password" 
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Min 6 characters"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Confirm Password</label>
-                  <input 
-                    type="password" 
-                    required
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-gray-50 focus:bg-white"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Must match password"
-                  />
-                </div>
-              </>
-            )}
+            <div className="flex justify-end">
+              <Link to="/forgot-password" className="text-xs font-bold text-accent hover:underline">Forgot Password?</Link>
+            </div>
 
             <button 
               type="submit" 
               disabled={loading}
               className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary/30"
             >
-              {loading ? (requirePasswordChange ? 'Updating...' : 'Authenticating...') : <><LogIn className="w-4 h-4" /> {requirePasswordChange ? 'Update Password' : 'Access Dashboard'}</>}
+              {loading ? 'Authenticating...' : <><LogIn className="w-4 h-4" /> Access Dashboard</>}
             </button>
           </form>
 

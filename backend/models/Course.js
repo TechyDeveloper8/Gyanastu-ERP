@@ -11,7 +11,8 @@ const courseSchema = mongoose.Schema({
   learningOutcomes: [{ type: String }],
   price: { type: Number, required: true },
   thumbnail: { type: String },
-  status: { type: String, enum: ['Active', 'Archived'], default: 'Active' }
+  syllabusUrl: { type: String },
+  status: { type: String, enum: ['Active', 'Inactive', 'Archived'], default: 'Active' }
 }, {
   timestamps: true,
   toJSON: {

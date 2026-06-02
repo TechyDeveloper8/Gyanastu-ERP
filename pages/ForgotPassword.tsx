@@ -63,10 +63,15 @@ const ForgotPassword: React.FC = () => {
     }
 
     setLoading(true);
+    console.log('[DEBUG] Starting password reset process for username:', username);
     try {
-      await authService.resetPassword(username, otp, newPassword);
+      console.log('[DEBUG] Calling authService.resetPassword API...');
+      const response = await authService.resetPassword(username, otp, newPassword);
+      console.log('[DEBUG] API Response:', response);
+      
       setSuccess('Password reset successfully. You can now login.');
       setTimeout(() => {
+        console.log('[DEBUG] Redirecting to login page...');
         navigate('/login');
       }, 3000);
     } catch (err: any) {
@@ -207,8 +212,8 @@ const ForgotPassword: React.FC = () => {
             
             <button 
               type="submit" 
-              disabled={loading || step !== 3 || success !== ''}
-              className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary/30"
+              disabled={loading || step !== 3 || success === 'Password reset successfully. You can now login.'}
+              className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-3 rounded-lg transition-all transform active:scale-95 flex items-center justify-center gap-2 shadow-lg shadow-primary/30 disabled:opacity-70 disabled:active:scale-100"
             >
               {loading ? 'Resetting...' : 'Reset Password'}
             </button>

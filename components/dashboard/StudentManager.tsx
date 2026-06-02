@@ -3,6 +3,7 @@ import { api } from '../../services/api';
 import { socket } from '../../services/socket';
 import { Search, Eye, Edit2, Plus, X, CheckCircle, ShieldAlert, Loader, ArrowLeftRight, UserCheck, Trash2 } from 'lucide-react';
 import { UserRole, StudentProfile } from '../../types';
+import DeleteConfirmationModal from '../DeleteConfirmationModal';
 
 interface StudentManagerProps {
   userRole: UserRole;
@@ -18,6 +19,8 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const [newCredentials, setNewCredentials] = useState<{ username: string, password: string } | null>(null);
 
   const [newStudent, setNewStudent] = useState({
@@ -122,10 +125,18 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('Delete this student completely? This action cannot be undone.')) {
-      try { await api.deleteStudent(id); } catch (err) { alert('Failed to delete student'); }
-    }
+  const handleDeleteClick = (id: string) => {
+    setStudentToDelete(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!studentToDelete) return;
+    try { 
+      await api.deleteStudent(studentToDelete); 
+      setIsDeleteModalOpen(false);
+      setStudentToDelete(null);
+    } catch (err) { alert('Failed to delete student'); }
   };
 
   const handleTransfer = (id: string) => {
@@ -144,7 +155,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
           <div><h2 className="text-lg font-heading font-bold text-primary">Student Directory</h2><p className="text-sm text-gray-500">Manage admissions, verify docs, and handle transfers.</p></div>
           <div className="flex gap-2 w-full md:w-auto">
             <div className="relative flex-grow md:flex-grow-0"><Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" /><input type="text" placeholder="Search Name or Roll No" className="pl-10 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-full" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} /></div>
-            {userRole !== UserRole.FACULTY && (<button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2"><Plus className="w-4 h-4" /> Add Student</button>)}
+            {userRole === UserRole.FRANCHISE_ADMIN && (<button onClick={() => setIsAddModalOpen(true)} className="bg-primary text-white px-4 py-2 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2"><Plus className="w-4 h-4" /> Add Student</button>)}
           </div>
         </div>
 
@@ -178,7 +189,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
                           ) : (
                             <>
                               <button className="text-gray-400 hover:text-primary p-1 border border-transparent hover:border-gray-200 rounded" title="View Profile"><Eye className="w-4 h-4" /></button>
-                              {userRole === UserRole.SUPER_ADMIN && (<><button onClick={() => handleTransfer(sid)} className="text-gray-400 hover:text-blue-600 p-1 border border-transparent hover:border-gray-200 rounded" title="Transfer Franchise"><ArrowLeftRight className="w-4 h-4" /></button><button onClick={() => handleDelete(sid)} className="text-gray-400 hover:text-red-500 p-1 border border-transparent hover:border-gray-200 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button></>)}
+                              {userRole === UserRole.SUPER_ADMIN && (<><button onClick={() => handleTransfer(sid)} className="text-gray-400 hover:text-blue-600 p-1 border border-transparent hover:border-gray-200 rounded" title="Transfer Franchise"><ArrowLeftRight className="w-4 h-4" /></button><button onClick={() => handleDeleteClick(sid)} className="text-gray-400 hover:text-red-500 p-1 border border-transparent hover:border-gray-200 rounded" title="Delete"><Trash2 className="w-4 h-4" /></button></>)}
                             </>
                           )}
                         </div>
@@ -190,6 +201,13 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
           </table>
         </div>
       </div>
+
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        onConfirm={confirmDelete}
+        title="Delete Student Record"
+      />
 
       {isAddModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

@@ -6,7 +6,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
-const { generatePassword, generateStudentUsername, generateFacultyUsername, generateFranchiseUsername, generateEmployeeCode } = require('./utils/credentials');
+const { generatePassword, generateStudentUsername, generateFacultyUsername, generateFranchiseUsername, generateFranchiseCode, generateFranchisePassword, generateEmployeeCode } = require('./utils/credentials');
+const { deleteFiles } = require('./utils/fileCleanup');
 
 require('dotenv').config();
 
@@ -129,9 +130,6 @@ app.post('/api/auth/login', async (req, res) => {
     const isMatch = user ? (user.password === password || await bcrypt.compare(password, user.password)) : false;
 
     if (isMatch) {
-      if (user.isFirstLogin) {
-        return res.json({ requirePasswordChange: true, userId: user._id, message: 'Password change required on first login' });
-      }
       if (user.password === password) {
         user.password = await bcrypt.hash(password, 10);
       }
@@ -251,22 +249,38 @@ app.post('/api/auth/verify-otp', async (req, res) => {
 
 app.post('/api/auth/reset-password', async (req, res) => {
   const { username, otp, newPassword } = req.body;
+  console.log(`[API] reset-password requested for username: ${username}`);
+
   try {
     const record = await PasswordResetOTP.findOne({ username, otp, used: false }).sort({ createdAt: -1 });
-    if (!record) return res.status(400).json({ message: 'Invalid or expired OTP' });
-    if (new Date() > record.expires_at) return res.status(400).json({ message: 'OTP has expired' });
+    if (!record) {
+      console.log(`[API] reset-password failed: Invalid or used OTP for ${username}`);
+      return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    if (new Date() > record.expires_at) {
+      console.log(`[API] reset-password failed: OTP expired for ${username}`);
+      return res.status(400).json({ message: 'OTP has expired' });
+    }
 
     const user = await User.findById(record.user_id);
-    if (!user) return res.status(404).json({ message: 'User not found' });
+    if (!user) {
+      console.log(`[API] reset-password failed: User not found (ID: ${record.user_id})`);
+      return res.status(404).json({ message: 'User not found' });
+    }
 
+    console.log(`[API] Hashing new password for ${username}...`);
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
+    console.log(`[API] Password updated in database for ${username}`);
 
     record.used = true;
     await record.save();
+    console.log(`[API] OTP marked as used for ${username}`);
 
     res.json({ message: 'Password reset successfully' });
   } catch (err) {
+    console.error(`[API] Error during reset-password for ${username}:`, err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -411,26 +425,56 @@ app.put('/api/students/:id', async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-app.delete('/api/students/:id', async (req, res) => {
+app.delete('/api/students/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const student = await Student.findOne({ user: req.params.id });
-    if (student) {
-      // Delete related records
-      await Attendance.deleteMany({ student: student._id });
-      await Fee.deleteMany({ student: student._id });
-      await Certificate.deleteMany({ studentId: req.params.id }); // Note: Certificate might store user ID as string in studentId
-      
-      // Delete the student record
-      await Student.findByIdAndDelete(student._id);
+    const student = await Student.findOne({ user: req.params.id }).session(session);
+    const user = await User.findById(req.params.id).session(session);
+
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'User not found' });
     }
-    
+
+    const filesToDelete = [];
+    if (user.avatarUrl) filesToDelete.push(user.avatarUrl);
+
+    if (student) {
+      // Find certificates to delete their PDFs
+      const certs = await Certificate.find({ studentId: req.params.id }).session(session);
+      certs.forEach(c => { if (c.pdfUrl) filesToDelete.push(c.pdfUrl); });
+
+      // Delete related records
+      await Attendance.deleteMany({ student: student._id }).session(session);
+      await Fee.deleteMany({ student: student._id }).session(session);
+      await Certificate.deleteMany({ studentId: req.params.id }).session(session);
+      await VerificationLog.deleteMany({ referenceId: student._id }).session(session);
+
+      // Delete the student record
+      await Student.findByIdAndDelete(student._id).session(session);
+    }
+
     // Delete the user record and OTPs
-    await User.findByIdAndDelete(req.params.id);
-    await PasswordResetOTP.deleteMany({ user_id: req.params.id });
-    
+    await User.findByIdAndDelete(req.params.id).session(session);
+    await PasswordResetOTP.deleteMany({ user_id: req.params.id }).session(session);
+    await Notification.deleteMany({ user: req.params.id }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Physical File Cleanup after DB commit
+    deleteFiles(filesToDelete);
+
     broadcast('student_deleted', { userId: req.params.id });
     res.json({ message: 'Deleted cleanly from all related databases' });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    try { await session.abortTransaction(); } catch (e) { }
+    session.endSession();
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // 4. Franchises CRUD
@@ -450,24 +494,63 @@ app.get('/api/franchises', async (req, res) => {
     res.json(enriched);
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
-app.post('/api/franchises', async (req, res) => {
-  try {
-    const { name, location, adminName, adminEmail } = req.body;
-    const franchise = await Franchise.create({ name, location, adminName });
+const franchisePhotoStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = path.join(__dirname, 'assets', 'franchises');
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'franchise-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const uploadFranchisePhoto = multer({ storage: franchisePhotoStorage });
 
-    const rawPassword = generatePassword();
-    const hashedPassword = await bcrypt.hash(rawPassword, 10);
-    const username = await generateFranchiseUsername(location);
-    const emailToUse = adminEmail || `${username.toLowerCase()}@gyanastu.com`;
+app.post('/api/franchises', uploadFranchisePhoto.single('franchisePhoto'), async (req, res) => {
+  try {
+    const {
+      name, ownerName, dateOfBirth, gender, mobileNumber, alternateMobileNumber, emailAddress,
+      aadhaarNumber, gstNumber, panNumber, establishmentYear,
+      addressLine1, addressLine2, city, district, state, pinCode
+    } = req.body;
+
+    const emailToUse = emailAddress;
 
     if (await User.findOne({ email: emailToUse })) return res.status(400).json({ message: 'User already exists with this email' });
 
+    const rawPassword = generateFranchisePassword();
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+    const username = await generateFranchiseUsername();
+    const franchiseCode = await generateFranchiseCode();
+
+    let avatarUrl = undefined;
+    if (req.file) {
+      const ext = path.extname(req.file.originalname);
+      const newFilename = `${franchiseCode}${ext}`;
+      const newPath = path.join(__dirname, 'assets', 'franchises', newFilename);
+      if (fs.existsSync(req.file.path)) fs.renameSync(req.file.path, newPath);
+      avatarUrl = `/assets/franchises/${newFilename}`;
+    }
+
+    const franchise = await Franchise.create({
+      franchiseCode, avatarUrl, name, location: city, ownerName, dateOfBirth, gender,
+      mobileNumber, alternateMobileNumber, emailAddress, aadhaarNumber, gstNumber, panNumber,
+      establishmentYear, addressLine1, addressLine2, city, district, state, pinCode,
+      status: 'Active'
+    });
+
     const adminUser = await User.create({
-      name: adminName,
+      name: ownerName,
       email: emailToUse,
       username,
       password: hashedPassword,
       role: 'FRANCHISE_ADMIN',
+      phone: mobileNumber,
+      avatarUrl,
+      address: `${addressLine1}, ${city}, ${state}`,
       referenceModel: 'Franchise',
       referenceId: franchise._id
     });
@@ -493,57 +576,175 @@ app.patch('/api/franchises/:id/status', async (req, res) => {
     res.json(franchise);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.delete('/api/franchises/:id', async (req, res) => {
+app.delete('/api/franchises/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const franchise = await Franchise.findById(req.params.id);
-    if (!franchise) return res.status(404).json({ message: 'Not found' });
+    const franchise = await Franchise.findById(req.params.id).session(session);
+    if (!franchise) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'Not found' });
+    }
+
+    const filesToDelete = [];
 
     // 1. Delete franchise admin user
     if (franchise.adminId) {
-      await User.findByIdAndDelete(franchise.adminId);
-      await PasswordResetOTP.deleteMany({ user_id: franchise.adminId });
+      const adminUser = await User.findById(franchise.adminId).session(session);
+      if (adminUser && adminUser.avatarUrl) filesToDelete.push(adminUser.avatarUrl);
+
+      await User.findByIdAndDelete(franchise.adminId).session(session);
+      await PasswordResetOTP.deleteMany({ user_id: franchise.adminId }).session(session);
+      await Notification.deleteMany({ user: franchise.adminId }).session(session);
     }
 
     // 2. Handle linked faculties
-    const faculties = await Faculty.find({ franchise: req.params.id });
+    const faculties = await Faculty.find({ franchise: req.params.id }).session(session);
     for (const fac of faculties) {
-      await User.findByIdAndDelete(fac.user);
-      await PasswordResetOTP.deleteMany({ user_id: fac.user });
-      await Faculty.findByIdAndDelete(fac._id);
+      const facUser = await User.findById(fac.user).session(session);
+      if (facUser && facUser.avatarUrl) filesToDelete.push(facUser.avatarUrl);
+
+      await User.findByIdAndDelete(fac.user).session(session);
+      await PasswordResetOTP.deleteMany({ user_id: fac.user }).session(session);
+      await Notification.deleteMany({ user: fac.user }).session(session);
+      await Faculty.findByIdAndDelete(fac._id).session(session);
     }
 
-    // 3. Suspend students and remove franchise link
-    await Student.updateMany({ franchise: req.params.id }, { status: 'Suspended', franchise: null });
+    // 3. Handle linked students
+    const students = await Student.find({ franchise: req.params.id }).session(session);
+    for (const student of students) {
+      const stUser = await User.findById(student.user).session(session);
+      if (stUser && stUser.avatarUrl) filesToDelete.push(stUser.avatarUrl);
 
-    // 4. Delete the franchise
-    await Franchise.findByIdAndDelete(req.params.id);
+      const certs = await Certificate.find({ studentId: student.user }).session(session);
+      certs.forEach(c => { if (c.pdfUrl) filesToDelete.push(c.pdfUrl); });
+
+      await Attendance.deleteMany({ student: student._id }).session(session);
+      await Fee.deleteMany({ student: student._id }).session(session);
+      await Certificate.deleteMany({ studentId: student.user }).session(session);
+      await VerificationLog.deleteMany({ referenceId: student._id }).session(session);
+
+      await Student.findByIdAndDelete(student._id).session(session);
+      await User.findByIdAndDelete(student.user).session(session);
+      await PasswordResetOTP.deleteMany({ user_id: student.user }).session(session);
+      await Notification.deleteMany({ user: student.user }).session(session);
+    }
+
+    // 4. Handle Batches
+    await Batch.deleteMany({ franchise: req.params.id }).session(session);
+
+    // 5. Delete the franchise
+    await Franchise.findByIdAndDelete(req.params.id).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Physical file cleanup
+    deleteFiles(filesToDelete);
 
     broadcast('franchise_deleted', req.params.id);
     res.json({ message: 'Franchise and all associated users deleted completely' });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    try { await session.abortTransaction(); } catch (e) { }
+    session.endSession();
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // 5. Courses CRUD
+const courseStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dirName = file.fieldname === 'courseImage' ? 'course_images' : 'coursesyllabus';
+    const dir = path.join(__dirname, 'assets', dirName);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    const cleanName = (req.body.title || 'course').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    const prefix = file.fieldname === 'courseImage' ? 'img' : 'pdf';
+    cb(null, `${cleanName}_${Date.now()}_${prefix}${path.extname(file.originalname)}`);
+  }
+});
+
+const uploadCourseFiles = multer({
+  storage: courseStorage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+}).fields([
+  { name: 'courseImage', maxCount: 1 },
+  { name: 'syllabusPdf', maxCount: 1 }
+]);
+
 app.get('/api/courses', async (req, res) => {
-  res.json(await Course.find());
+  res.json(await Course.find().sort({ createdAt: -1 }));
 });
-app.post('/api/courses', async (req, res) => {
+
+app.post('/api/courses', requireAuth, requireRole(['SUPER_ADMIN']), uploadCourseFiles, async (req, res) => {
   try {
-    const course = await Course.create(req.body);
+    const courseData = { ...req.body };
+    if (req.files) {
+      if (req.files['courseImage'] && req.files['courseImage'].length > 0) {
+        courseData.thumbnail = `/assets/course_images/${req.files['courseImage'][0].filename}`;
+      }
+      if (req.files['syllabusPdf'] && req.files['syllabusPdf'].length > 0) {
+        courseData.syllabusUrl = `/assets/coursesyllabus/${req.files['syllabusPdf'][0].filename}`;
+      }
+    }
+    courseData.slug = courseData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+
+    const course = await Course.create(courseData);
     broadcast('course_added', course);
-    res.json(course);
+    res.status(201).json(course);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.put('/api/courses/:id', async (req, res) => {
+
+app.put('/api/courses/:id', requireAuth, requireRole(['SUPER_ADMIN']), uploadCourseFiles, async (req, res) => {
   try {
-    const course = await Course.findByIdAndUpdate(req.params.id, req.body, { new: true });
-    broadcast('course_updated', course);
-    res.json(course);
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    const courseData = { ...req.body };
+    const filesToDelete = [];
+
+    if (req.files) {
+      if (req.files['courseImage'] && req.files['courseImage'].length > 0) {
+        if (course.thumbnail && course.thumbnail.startsWith('/assets/')) filesToDelete.push(course.thumbnail);
+        courseData.thumbnail = `/assets/course_images/${req.files['courseImage'][0].filename}`;
+      }
+      if (req.files['syllabusPdf'] && req.files['syllabusPdf'].length > 0) {
+        if (course.syllabusUrl && course.syllabusUrl.startsWith('/assets/')) filesToDelete.push(course.syllabusUrl);
+        courseData.syllabusUrl = `/assets/coursesyllabus/${req.files['syllabusPdf'][0].filename}`;
+      }
+    }
+
+    if (courseData.title) {
+      courseData.slug = courseData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+    }
+
+    const updatedCourse = await Course.findByIdAndUpdate(req.params.id, courseData, { new: true });
+
+    if (filesToDelete.length > 0) deleteFiles(filesToDelete);
+
+    broadcast('course_updated', updatedCourse);
+    res.json(updatedCourse);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.delete('/api/courses/:id', async (req, res) => {
+
+app.delete('/api/courses/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
   try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+
+    const filesToDelete = [];
+    if (course.thumbnail && course.thumbnail.startsWith('/assets/')) filesToDelete.push(course.thumbnail);
+    if (course.syllabusUrl && course.syllabusUrl.startsWith('/assets/')) filesToDelete.push(course.syllabusUrl);
+
     await Course.findByIdAndDelete(req.params.id);
+    if (filesToDelete.length > 0) deleteFiles(filesToDelete);
+
     broadcast('course_deleted', req.params.id);
     res.json({ message: 'Deleted' });
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -554,7 +755,7 @@ app.get('/api/batches', requireAuth, async (req, res) => {
   try {
     const { franchiseId, facultyId } = req.query;
     let query = {};
-    
+
     if (req.user.role === 'FRANCHISE_ADMIN') {
       query.franchise = req.user.franchiseId;
     } else if (req.user.role === 'FACULTY') {
@@ -626,10 +827,10 @@ app.delete('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), as
   try {
     const batch = await Batch.findOneAndDelete({ _id: req.params.id, franchise: req.user.franchiseId });
     if (!batch) return res.status(404).json({ message: 'Batch not found or access denied' });
-    
+
     // Unassign students from this batch
     await Student.updateMany({ batch: req.params.id }, { batch: null });
-    
+
     broadcast('batch_deleted', req.params.id);
     res.json({ message: 'Deleted' });
   } catch (err) { res.status(500).json({ message: err.message }); }
@@ -713,22 +914,47 @@ app.post('/api/faculty', uploadFacultyPhoto.single('facultyPhoto'), async (req, 
     res.status(201).json({ id: user._id, name, email, role: 'FACULTY', employeeCode, generatedUsername: username, generatedPassword: rawPassword });
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
-app.delete('/api/faculty/:id', async (req, res) => {
+app.delete('/api/faculty/:id', requireAuth, requireRole(['SUPER_ADMIN']), async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-    const faculty = await Faculty.findOne({ user: req.params.id });
+    const faculty = await Faculty.findOne({ user: req.params.id }).session(session);
+    const user = await User.findById(req.params.id).session(session);
+
+    if (!user) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const filesToDelete = [];
+    if (user.avatarUrl) filesToDelete.push(user.avatarUrl);
+
     if (faculty) {
       // Unassign from batches
-      await Batch.updateMany({ faculty: req.params.id }, { faculty: null });
-      await Faculty.findByIdAndDelete(faculty._id);
+      await Batch.updateMany({ faculty: req.params.id }, { faculty: null }).session(session);
+      await Faculty.findByIdAndDelete(faculty._id).session(session);
     }
-    
+
     // Delete User and OTPs
-    await User.findByIdAndDelete(req.params.id);
-    await PasswordResetOTP.deleteMany({ user_id: req.params.id });
-    
+    await User.findByIdAndDelete(req.params.id).session(session);
+    await PasswordResetOTP.deleteMany({ user_id: req.params.id }).session(session);
+    await Notification.deleteMany({ user: req.params.id }).session(session);
+
+    await session.commitTransaction();
+    session.endSession();
+
+    // Physical File Cleanup
+    deleteFiles(filesToDelete);
+
     broadcast('faculty_deleted', req.params.id);
     res.json({ message: 'Faculty completely removed from database' });
-  } catch (err) { res.status(500).json({ message: err.message }); }
+  } catch (err) {
+    try { await session.abortTransaction(); } catch (e) { }
+    session.endSession();
+    res.status(500).json({ message: err.message });
+  }
 });
 
 // 8. Attendance
@@ -736,7 +962,7 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
   try {
     const { studentId, batchId, date, startDate, endDate } = req.query;
     const query = {};
-    
+
     // Security check: Student can only view their own
     if (req.user.role === 'STUDENT') {
       const student = await Student.findOne({ user: req.user.id });
@@ -749,7 +975,7 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
     }
 
     if (batchId) query.batch = batchId;
-    
+
     if (date) {
       const targetDate = new Date(date);
       targetDate.setHours(0, 0, 0, 0);
@@ -757,8 +983,8 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
       nextDate.setDate(targetDate.getDate() + 1);
       query.date = { $gte: targetDate, $lt: nextDate };
     } else if (startDate && endDate) {
-      const sd = new Date(startDate); sd.setHours(0,0,0,0);
-      const ed = new Date(endDate); ed.setHours(23,59,59,999);
+      const sd = new Date(startDate); sd.setHours(0, 0, 0, 0);
+      const ed = new Date(endDate); ed.setHours(23, 59, 59, 999);
       query.date = { $gte: sd, $lte: ed };
     }
 
@@ -779,16 +1005,16 @@ app.get('/api/attendance', requireAuth, async (req, res) => {
 app.post('/api/attendance', requireAuth, requireRole(['FRANCHISE_ADMIN', 'FACULTY']), async (req, res) => {
   try {
     const { batchId, date, records } = req.body;
-    
+
     // Check if the user has access to this batch
     const batch = await Batch.findById(batchId);
     if (!batch) return res.status(404).json({ message: 'Batch not found' });
     if (req.user.role === 'FRANCHISE_ADMIN' && batch.franchise.toString() !== req.user.franchiseId) {
       return res.status(403).json({ message: 'Access Denied' });
     }
-    
+
     const targetDate = new Date(date);
-    targetDate.setHours(0,0,0,0);
+    targetDate.setHours(0, 0, 0, 0);
 
     const promises = records.map(async (rec) => {
       // Find actual Student document via User ID (rec.studentId)
@@ -796,7 +1022,7 @@ app.post('/api/attendance', requireAuth, requireRole(['FRANCHISE_ADMIN', 'FACULT
       if (!studentDoc) return;
       return Attendance.findOneAndUpdate(
         { student: studentDoc._id, batch: batchId, date: targetDate },
-        { status: rec.status, remarks: rec.remarks, markedBy: req.user.id }, 
+        { status: rec.status, remarks: rec.remarks, markedBy: req.user.id },
         { upsert: true, new: true }
       );
     });
@@ -804,14 +1030,14 @@ app.post('/api/attendance', requireAuth, requireRole(['FRANCHISE_ADMIN', 'FACULT
 
     // Recalculate attendance % for all these students
     for (const rec of records) {
-       const studentDoc = await Student.findOne({ user: rec.studentId });
-       if (studentDoc) {
-          const totalDays = await Attendance.countDocuments({ student: studentDoc._id });
-          const presentDays = await Attendance.countDocuments({ student: studentDoc._id, status: 'Present' });
-          const pct = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
-          studentDoc.attendancePercentage = parseFloat(pct.toFixed(2));
-          await studentDoc.save();
-       }
+      const studentDoc = await Student.findOne({ user: rec.studentId });
+      if (studentDoc) {
+        const totalDays = await Attendance.countDocuments({ student: studentDoc._id });
+        const presentDays = await Attendance.countDocuments({ student: studentDoc._id, status: 'Present' });
+        const pct = totalDays > 0 ? (presentDays / totalDays) * 100 : 0;
+        studentDoc.attendancePercentage = parseFloat(pct.toFixed(2));
+        await studentDoc.save();
+      }
     }
 
     broadcast('attendance_marked', { batchId, date });
@@ -823,7 +1049,7 @@ app.get('/api/attendance/reports/student', requireAuth, async (req, res) => {
   try {
     const { franchiseId } = req.query;
     let studentQuery = {};
-    
+
     if (req.user.role === 'FRANCHISE_ADMIN') {
       studentQuery.franchise = req.user.franchiseId;
     } else if (req.user.role === 'SUPER_ADMIN' && franchiseId) {
@@ -831,14 +1057,14 @@ app.get('/api/attendance/reports/student', requireAuth, async (req, res) => {
     }
 
     const students = await Student.find(studentQuery).populate('user', 'name').populate('batch', 'batchName');
-    
+
     const report = await Promise.all(students.map(async (s) => {
       const total = await Attendance.countDocuments({ student: s._id });
       const present = await Attendance.countDocuments({ student: s._id, status: 'Present' });
       const absent = await Attendance.countDocuments({ student: s._id, status: 'Absent' });
       const late = await Attendance.countDocuments({ student: s._id, status: 'Late' });
       const leave = await Attendance.countDocuments({ student: s._id, status: 'Leave' });
-      
+
       return {
         studentId: s.user._id,
         studentName: s.user.name,
@@ -851,9 +1077,9 @@ app.get('/api/attendance/reports/student', requireAuth, async (req, res) => {
         attendancePercentage: s.attendancePercentage
       };
     }));
-    
+
     res.json(report);
-  } catch(err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 app.get('/api/attendance/reports/batch', requireAuth, async (req, res) => {
@@ -869,16 +1095,16 @@ app.get('/api/attendance/reports/batch', requireAuth, async (req, res) => {
     const batches = await Batch.find(batchQuery);
     const report = await Promise.all(batches.map(async (b) => {
       const studentCount = await Student.countDocuments({ batch: b._id });
-      
+
       // Today's attendance
       const today = new Date();
-      today.setHours(0,0,0,0);
+      today.setHours(0, 0, 0, 0);
       const nextDate = new Date(today);
       nextDate.setDate(today.getDate() + 1);
-      
+
       const todayRecords = await Attendance.find({ batch: b._id, date: { $gte: today, $lt: nextDate } });
       const presentToday = todayRecords.filter(r => r.status === 'Present').length;
-      
+
       // Monthly average approx (just calculating all time average for simplicity, can be refined)
       const allRecords = await Attendance.find({ batch: b._id });
       const totalP = allRecords.filter(r => r.status === 'Present').length;
@@ -893,7 +1119,7 @@ app.get('/api/attendance/reports/batch', requireAuth, async (req, res) => {
       };
     }));
     res.json(report);
-  } catch(err) { res.status(500).json({ message: err.message }); }
+  } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 // 9. Study Materials

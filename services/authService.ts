@@ -6,10 +6,6 @@ export const authService = {
   login: async (email: string, password: string): Promise<any> => {
     // Call the real backend endpoint
     const response: any = await api.login({ email, password });
-    
-    if (response.requirePasswordChange) {
-      return response;
-    }
 
     // Store the JWT token
     if (response.token) {

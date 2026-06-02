@@ -42,15 +42,42 @@ export interface Course {
   learningOutcomes: string[];
   price: number;
   thumbnail: string;
-  status: 'Active' | 'Archived';
+  syllabusUrl?: string;
+  status: 'Active' | 'Inactive' | 'Archived';
+  totalStudents?: number;
 }
 
 export interface Franchise {
   id: string;
+  franchiseCode?: string;
+  avatarUrl?: string;
+
   name: string;
   location: string;
+  
+  ownerName: string;
+  dateOfBirth?: string;
+  gender?: string;
+
+  mobileNumber: string;
+  alternateMobileNumber?: string;
+  emailAddress: string;
+
+  aadhaarNumber: string;
+  gstNumber: string;
+  panNumber?: string;
+  establishmentYear?: string;
+
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  district: string;
+  state: string;
+  pinCode: string;
+
   adminId: string;
-  adminName: string;
+  adminName: string; // Deprecated or mapped to ownerName
+  
   status: 'Active' | 'Pending' | 'Suspended';
   studentCount: number;
   revenue: number;
