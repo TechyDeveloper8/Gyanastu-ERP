@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Menu, X, LogIn, LogOut, ChevronDown, Award, Globe, BookOpen } from 'lucide-react';
 import { UserRole } from '../types';
+import { api } from '../services/api';
+import { socket } from '../services/socket';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -14,6 +16,36 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+
+  const [cms, setCms] = useState({
+    contact_info: {
+      phone: "+91 8292022633",
+      email: "info@gyanastu.com",
+      address: "R.N Agrawal Road, Chuniharitola, Bhagalpur, Bihar, 812002"
+    }
+  });
+
+  const fetchCMS = async () => {
+    try {
+      const data: any = await api.getCMSContent();
+      setCms(prev => {
+        const next = { ...prev };
+        ['contact_info'].forEach(sec => {
+          const secData = data.find((d: any) => d.id === sec)?.content;
+          if (secData) next[sec as keyof typeof next] = { ...next[sec as keyof typeof next], ...secData };
+        });
+        return next;
+      });
+    } catch (err) { }
+  };
+
+  useEffect(() => {
+    fetchCMS();
+    socket.on('cms_updated', fetchCMS);
+    return () => {
+      socket.off('cms_updated', fetchCMS);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -222,15 +254,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-3">
                   <span>📍</span>
-                  <span>R.N Agrawal Road, Chuniharitola, Bhagalpur, Bihar, 812002</span>
+                  <span>{cms.contact_info.address}</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <span>📞</span>
-                  <span>+91 8292022633</span>
+                  <span>{cms.contact_info.phone}</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <span>✉️</span>
-                  <span>[EMAIL_ADDRESS]</span>
+                  <span>{cms.contact_info.email}</span>
                 </li>
               </ul>
             </div>
