@@ -162,7 +162,7 @@ const CourseManager: React.FC = () => {
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       {course.thumbnail ? (
-                        <img src={`http://localhost:5000${course.thumbnail}`} alt="" className={`w-12 h-12 rounded-lg object-cover shadow-sm ${course.status !== 'Active' ? 'grayscale' : ''}`} onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
+                        <img src={`http://localhost:5000${course.thumbnail}`} alt="" className={`w-12 h-12 rounded-lg object-cover shadow-sm ${course.status !== 'Active' ? 'grayscale' : ''}`} onError={(e) => (e.currentTarget.src = 'https://placehold.co/150x150')} />
                       ) : (
                         <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center text-primary/50"><Book className="w-6 h-6" /></div>
                       )}
@@ -290,7 +290,7 @@ const CourseManager: React.FC = () => {
             <div className="relative bg-white pt-6 pb-6 px-8 border-b border-gray-100 flex justify-between items-start shrink-0">
               <div className="flex gap-6 items-center">
                 {selectedCourse.thumbnail ? (
-                  <img src={`http://localhost:5000${selectedCourse.thumbnail}`} alt="" className="w-24 h-24 rounded-xl object-cover shadow-sm border border-gray-100" onError={(e) => (e.currentTarget.src = 'https://via.placeholder.com/150')} />
+                  <img src={`http://localhost:5000${selectedCourse.thumbnail}`} alt="" className="w-24 h-24 rounded-xl object-cover shadow-sm border border-gray-100" onError={(e) => (e.currentTarget.src = 'https://placehold.co/150x150')} />
                 ) : (
                   <div className="w-24 h-24 rounded-xl bg-primary/10 flex items-center justify-center text-primary/50 border border-primary/20"><Book className="w-10 h-10" /></div>
                 )}

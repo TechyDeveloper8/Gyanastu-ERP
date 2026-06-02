@@ -173,7 +173,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
                   const feeDue = (student.totalFees || 0) - (student.feesPaid || 0);
                   return (
                     <tr key={sid} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4"><div className="flex items-center gap-3"><img src={student.avatarUrl || 'https://via.placeholder.com/40'} alt="" className="w-8 h-8 rounded-full bg-gray-100" /><div><p className="font-bold text-gray-800">{student.name}</p><p className="text-xs text-gray-500">{student.email}</p></div></div></td>
+                      <td className="p-4"><div className="flex items-center gap-3"><img src={student.avatarUrl || 'https://placehold.co/40x40'} alt="" className="w-8 h-8 rounded-full bg-gray-100" /><div><p className="font-bold text-gray-800">{student.name}</p><p className="text-xs text-gray-500">{student.email}</p></div></div></td>
                       <td className="p-4 font-mono text-gray-600">{student.rollNumber || 'N/A'}</td>
                       <td className="p-4">
                         <p className="font-bold text-gray-800">{(student as any).courseName || 'N/A'}</p>

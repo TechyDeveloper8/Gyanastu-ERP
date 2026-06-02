@@ -189,8 +189,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </p>
               <div className="flex gap-4">
                 {/* Social Placeholders */}
-                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">fb</div>
-                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">in</div>
+                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">fb <link rel="stylesheet" href="https://www.facebook.com/yourgyanastu/" /></div>
+                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">in <link rel="stylesheet" href="https://www.instagram.com/gyanastu_official/" /></div>
               </div>
             </div>
 
@@ -222,15 +222,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <ul className="space-y-3 text-sm">
                 <li className="flex items-start gap-3">
                   <span>📍</span>
-                  <span>123 Tech Park, Cyber City, New Delhi, 110001</span>
+                  <span>R.N Agrawal Road, Chuniharitola, Bhagalpur, Bihar, 812002</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <span>📞</span>
-                  <span>+91 98765 43210</span>
+                  <span>+91 8292022633</span>
                 </li>
                 <li className="flex items-center gap-3">
                   <span>✉️</span>
-                  <span>info@gyanastu.com</span>
+                  <span>[EMAIL_ADDRESS]</span>
                 </li>
               </ul>
             </div>

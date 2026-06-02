@@ -108,7 +108,7 @@ const Courses: React.FC = () => {
               filteredCourses.map((course) => (
                 <div key={course.id || course._id} className="bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group flex flex-col h-full">
                   <div className="relative overflow-hidden h-56">
-                    <img src={course.thumbnail || 'https://via.placeholder.com/400x250'} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img src={course.thumbnail || 'https://placehold.co/400x250'} alt={course.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     <div className="absolute top-4 right-4 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">
                       {course.category}
                     </div>
