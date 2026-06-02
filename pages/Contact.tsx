@@ -129,7 +129,7 @@ const Contact: React.FC = () => {
             <div className="col-span-1 md:col-span-2 space-y-8">
               {/* Fake Map */}
               <div className="bg-gray-200 w-full h-64 rounded-xl flex items-center justify-center text-gray-500 font-bold text-lg shadow-inner">
-                <MapPin className="w-6 h-6 mr-2" /> Google Maps Integration Placeholder
+                <MapPin className="w-6 h-6 mr-2" /> Google Maps Integration Placeholder <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d7217.202630675968!2d86.96755114284116!3d25.250349910706753!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x39f04a07d6b0d26f%3A0x6a449cbed7cb5a88!2sGyanastu%20Institute%20of%20Accounts%20Technician%20Main%20Branch!5e0!3m2!1sen!2sin!4v1780397421572!5m2!1sen!2sin" width="600" height="450" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"></iframe>
               </div>
 
               <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 relative">
