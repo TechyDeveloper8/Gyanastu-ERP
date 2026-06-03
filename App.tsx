@@ -1,5 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Analytics } from '@vercel/analytics/react';
 import { AuthProvider } from './context/AuthContext';
 import Layout from './components/Layout';
 import Loading from './components/Loading';
@@ -37,6 +38,7 @@ function App() {
           </Suspense>
         </Layout>
       </Router>
+      <Analytics />
     </AuthProvider>
   );
 }

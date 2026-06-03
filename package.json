@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@getbrevo/brevo": "^5.0.4",
+    "@vercel/analytics": "^2.0.1",
     "cors": "^2.8.6",
     "dependencies": "^0.0.1",
     "fabric": "^5.3.0",
