@@ -63,7 +63,7 @@ export const api = {
   
   // Franchises
   getFranchises: () => request('/franchises'),
-  createFranchise: (data: any) => request(`/franchises`, { method: 'POST', body: JSON.stringify(data) }),
+  createFranchise: (data: any) => request(`/franchises`, { method: 'POST', body: data instanceof FormData ? data : JSON.stringify(data) }),
   updateFranchiseStatus: (id: string, status: string) => request(`/franchises/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   updateFranchise: (id: string, data: any) => request(`/franchises/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteFranchise: (id: string) => request(`/franchises/${id}`, { method: 'DELETE' }),

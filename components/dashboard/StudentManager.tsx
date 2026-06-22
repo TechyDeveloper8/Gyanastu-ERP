@@ -41,13 +41,13 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
 
       const courseList = Array.isArray(resCourses) ? resCourses : [];
       setCourses(courseList);
-      
+
       const franchiseList = Array.isArray(resFranchises) ? resFranchises : resFranchises.data || [];
       setFranchises(franchiseList);
-      
+
       const batchList = Array.isArray(resBatches) ? resBatches : [];
       setBatches(batchList);
-      
+
       if (courseList.length > 0 && !newStudent.courseId) {
         setNewStudent(prev => ({ ...prev, courseId: courseList[0]._id || courseList[0].id }));
       }
@@ -118,7 +118,7 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
       try {
         const updatedData = {
           status: 'Active' as const,
-          rollNumber: `GY-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+          rollNumber: `GYAN-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
         };
         await api.updateStudent(id, updatedData);
       } catch (err) { alert('Failed to verify student'); }
@@ -132,8 +132,8 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
 
   const confirmDelete = async () => {
     if (!studentToDelete) return;
-    try { 
-      await api.deleteStudent(studentToDelete); 
+    try {
+      await api.deleteStudent(studentToDelete);
       setIsDeleteModalOpen(false);
       setStudentToDelete(null);
     } catch (err) { alert('Failed to delete student'); }
@@ -255,13 +255,13 @@ const StudentManager: React.FC<StudentManagerProps> = ({ userRole, franchiseId }
                       <div className="flex flex-col gap-2 max-h-32 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-white">
                         {franchises.length === 0 ? <p className="text-xs text-gray-400">No franchises found</p> : franchises.map((f: any) => (
                           <label key={f._id || f.id} className="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1 rounded transition-colors">
-                            <input 
-                              type="radio" 
-                              name="franchiseName" 
-                              value={f.name} 
-                              checked={newStudent.franchiseName === f.name} 
-                              onChange={e => setNewStudent({ ...newStudent, franchiseName: e.target.value })} 
-                              className="text-primary focus:ring-primary h-4 w-4" 
+                            <input
+                              type="radio"
+                              name="franchiseName"
+                              value={f.name}
+                              checked={newStudent.franchiseName === f.name}
+                              onChange={e => setNewStudent({ ...newStudent, franchiseName: e.target.value })}
+                              className="text-primary focus:ring-primary h-4 w-4"
                             />
                             {f.name}
                           </label>
