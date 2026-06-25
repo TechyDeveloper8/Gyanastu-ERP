@@ -200,28 +200,39 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       expires_at: expiresAt
     });
 
-    // Send email
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: process.env.SMTP_PORT || 587,
-      secure: false,
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
+    // Send email using Brevo API
+    const brevoApiKey = process.env.BREVO_API_KEY;
+    const senderEmail = process.env.SMTP_FROM || process.env.SMTP_USER || 'noreply@gyanastu.com';
+
+    if (brevoApiKey && brevoApiKey !== 'YOUR_BREVO_API_KEY_HERE') {
+      try {
+        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'accept': 'application/json',
+            'api-key': brevoApiKey,
+            'content-type': 'application/json'
+          },
+          body: JSON.stringify({
+            sender: { email: senderEmail, name: 'Gyanastu ERP' },
+            to: [{ email: user.email, name: user.name || 'User' }],
+            subject: 'Password Reset OTP - Gyanastu ERP',
+            textContent: `Your OTP for password reset is: ${otp}. It will expire in 10 minutes.`,
+            htmlContent: `<html><body><p>Hello,</p><p>Your OTP for password reset is: <strong>${otp}</strong>.</p><p>It will expire in 10 minutes.</p></body></html>`
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('[Brevo API Error]:', errorData);
+          throw new Error('Failed to send OTP email via Brevo API');
+        }
+      } catch (emailErr) {
+        console.error('Error sending email:', emailErr);
+        return res.status(500).json({ message: 'Error sending email. Please try again later.' });
       }
-    });
-
-    const mailOptions = {
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
-      to: user.email,
-      subject: 'Password Reset OTP - Gyanastu ERP',
-      text: `Your OTP for password reset is: ${otp}. It will expire in 10 minutes.`
-    };
-
-    if (process.env.SMTP_USER && process.env.SMTP_PASS) {
-      await transporter.sendMail(mailOptions);
     } else {
-      console.log(`[DEV MODE] OTP for ${user.email} is: ${otp}`);
+      console.log(`[DEV MODE] OTP for ${user.email} is: ${otp} (Brevo API Key not configured)`);
     }
 
     // Mask email for response
