@@ -225,13 +225,11 @@ app.post('/api/auth/forgot-password', async (req, res) => {
         if (!response.ok) {
           const errorData = await response.json();
           console.error('[Brevo API Error]:', errorData);
-          throw new Error('Brevo API Error: ' + JSON.stringify(errorData));
+          throw new Error('Failed to send OTP email via Brevo API');
         }
       } catch (emailErr) {
         console.error('Error sending email:', emailErr);
-        return res.status(500).json({ 
-          message: 'EMAIL_ERROR: ' + emailErr.message
-        });
+        return res.status(500).json({ message: 'Error sending email. Please try again later.' });
       }
     } else {
       console.log(`[DEV MODE] OTP for ${user.email} is: ${otp} (Brevo API Key not configured)`);
