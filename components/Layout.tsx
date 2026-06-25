@@ -221,8 +221,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </p>
               <div className="flex gap-4">
                 {/* Social Placeholders */}
-                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">fb <link rel="stylesheet" href="https://www.facebook.com/yourgyanastu/" /></div>
-                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">in <link rel="stylesheet" href="https://www.instagram.com/gyanastu_official/" /></div>
+                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">fb <link href="https://www.facebook.com/yourgyanastu/" /></div>
+                <div className="w-8 h-8 bg-gray-700 rounded-full hover:bg-accent transition-colors cursor-pointer flex items-center justify-center">in <link href="https://www.instagram.com/gyanastu_official/" /></div>
               </div>
             </div>
 
