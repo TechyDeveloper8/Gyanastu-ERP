@@ -230,8 +230,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
       } catch (emailErr) {
         console.error('Error sending email:', emailErr);
         return res.status(500).json({ 
-          message: 'Error sending email. Please try again later.', 
-          details: emailErr.message 
+          message: 'EMAIL_ERROR: ' + emailErr.message
         });
       }
     } else {
