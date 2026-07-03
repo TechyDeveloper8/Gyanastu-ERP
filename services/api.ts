@@ -70,6 +70,7 @@ export const api = {
   
   // Courses
   getCourses: () => request('/courses'),
+  getCourseById: (id: string) => request(`/courses/${id}`),
   createCourse: (data: any) => request('/courses', { method: 'POST', body: JSON.stringify(data) }),
   updateCourse: (id: string, data: any) => request(`/courses/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteCourse: (id: string) => request(`/courses/${id}`, { method: 'DELETE' }),

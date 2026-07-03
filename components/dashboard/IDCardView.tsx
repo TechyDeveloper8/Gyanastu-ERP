@@ -184,9 +184,10 @@ const IDCardView: React.FC<IDCardViewProps> = ({ student }) => {
 
   // ─── Prepare display data ──────────────────────────────────────────────────
   const { line1: addr1, line2: addr2 } = splitAddress(studentData.address || '');
-  const joinDate = studentData.admissionDate
-    ? new Date(studentData.admissionDate).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
-    : 'N/A';
+  const joinDateRaw = studentData.createdAt || studentData.admissionDate || studentData.joinDate;
+  const joinDate = joinDateRaw
+    ? new Date(joinDateRaw).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const photoUrl = studentData.avatarUrl || '';
   const displayScale = 0.5; // Scale down for UI display (662×1075 → 331×537)
 
@@ -351,14 +352,17 @@ const IDCardView: React.FC<IDCardViewProps> = ({ student }) => {
 
         {/* ERP ID */}
         <div style={absStyle(BACK_COORDS.erpId.left, BACK_COORDS.erpId.top, BACK_COORDS.erpId.size)}>
-          {studentData.erpId || studentData.email?.split('@')[0] || 'N/A'}
+          {studentData.username || studentData.erpId || studentData.email?.split('@')[0] || 'N/A'}
         </div>
 
-        {/* Franchise Name */}
+        {/* Franchise Address */}
         <div style={absStyle(BACK_COORDS.franchiseAddr.left, BACK_COORDS.franchiseAddr.top, BACK_COORDS.franchiseAddr.size, {
           maxWidth: `${BACK_COORDS.franchiseAddr.maxWidth}px`,
+          whiteSpace: 'normal',
+          wordWrap: 'break-word',
+          lineHeight: '18px',
         })}>
-          {studentData.franchiseName || ''}
+          {studentData.franchiseAddress || studentData.franchiseName || ''}
         </div>
       </div>
     </div>

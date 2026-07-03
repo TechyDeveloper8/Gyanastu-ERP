@@ -693,6 +693,16 @@ app.get('/api/courses', async (req, res) => {
   res.json(await Course.find().sort({ createdAt: -1 }));
 });
 
+app.get('/api/courses/:id', async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ message: 'Course not found' });
+    res.json(course);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 app.post('/api/courses', requireAuth, requireRole(['SUPER_ADMIN']), uploadCourseFiles, async (req, res) => {
   try {
     const courseData = { ...req.body };

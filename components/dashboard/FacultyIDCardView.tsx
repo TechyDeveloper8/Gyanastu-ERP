@@ -26,6 +26,7 @@ const BACK_COORDS = {
   facultyId: { left: 230, top: 375, size: 18 },
   mobileNo: { left: 230, top: 412, size: 18 },
   franchise: { left: 230, top: 449, size: 18, maxWidth: 300 },
+  franchiseAddress: { left: 230, top: 486, size: 14, maxWidth: 300 },
   franchiseFooter: { left: 105, top: 803, size: 13, maxWidth: 200 },
 };
 
@@ -237,7 +238,7 @@ const FacultyIDCardView: React.FC<FacultyIDCardViewProps> = ({ faculty }) => {
 
         {/* Employee Code */}
         <div style={absStyle(FRONT_COORDS.employeeCode.left, FRONT_COORDS.employeeCode.top, FRONT_COORDS.employeeCode.size || 18)}>
-          {facultyData.employeeCode || facultyData.username || 'N/A'}
+          {facultyData.employeeCode || 'N/A'}
         </div>
 
         {/* Join Date */}
@@ -295,6 +296,16 @@ const FacultyIDCardView: React.FC<FacultyIDCardViewProps> = ({ faculty }) => {
           {facultyData.franchiseName || 'N/A'}
         </div>
 
+        {/* Franchise Address */}
+        <div style={absStyle(BACK_COORDS.franchiseAddress.left, BACK_COORDS.franchiseAddress.top, BACK_COORDS.franchiseAddress.size || 14, {
+          maxWidth: `${BACK_COORDS.franchiseAddress.maxWidth}px`,
+          whiteSpace: 'normal',
+          wordWrap: 'break-word',
+          lineHeight: '18px',
+        })}>
+          {facultyData.franchiseAddress || 'N/A'}
+        </div>
+
         {/* Franchise Name (footer) */}
         <div style={absStyle(BACK_COORDS.franchiseFooter.left, BACK_COORDS.franchiseFooter.top, BACK_COORDS.franchiseFooter.size || 12, {
           color: '#d4d4d4ff',
@@ -318,7 +329,7 @@ const FacultyIDCardView: React.FC<FacultyIDCardViewProps> = ({ faculty }) => {
           {facultyData.name}'s ID Card
         </h2>
         <p className="text-sm text-gray-500 mt-1">
-          Employee Code: <span className="font-mono font-bold text-teal-600">{facultyData.employeeCode || facultyData.username}</span>
+          Employee Code: <span className="font-mono font-bold text-teal-600">{facultyData.employeeCode || 'N/A'}</span>
         </p>
       </div>
 

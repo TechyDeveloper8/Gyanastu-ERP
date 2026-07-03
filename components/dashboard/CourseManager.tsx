@@ -244,7 +244,7 @@ const CourseManager: React.FC = () => {
                   <div className="md:col-span-2"><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Name *</label><input required type="text" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 focus:border-primary/40 outline-none transition-all" value={newCourse.title} onChange={e => setNewCourse({...newCourse, title: e.target.value})} placeholder="e.g. Advanced Web Development" /></div>
                   <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Category *</label><input required type="text" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 outline-none" value={newCourse.category} onChange={e => setNewCourse({...newCourse, category: e.target.value})} placeholder="e.g. Programming" /></div>
                   <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Duration *</label><input required type="text" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 outline-none" value={newCourse.duration} onChange={e => setNewCourse({...newCourse, duration: e.target.value})} placeholder="e.g. 6 Months" /></div>
-                  <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Fee (₹) *</label><input required type="number" min="0" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 outline-none" value={newCourse.price} onChange={e => setNewCourse({...newCourse, price: parseInt(e.target.value) || 0})} /></div>
+                  <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Fee (Rs.) *</label><input required type="number" min="0" className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 outline-none" value={newCourse.price} onChange={e => setNewCourse({...newCourse, price: parseInt(e.target.value) || 0})} /></div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Course Status</label>
                     <select className="w-full border border-gray-200 rounded-lg px-4 py-2.5 focus:ring-2 focus:ring-primary/20 outline-none font-bold" value={newCourse.status} onChange={e => setNewCourse({...newCourse, status: e.target.value})}>
@@ -316,7 +316,7 @@ const CourseManager: React.FC = () => {
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center items-center text-center">
                   <IndianRupee className="w-6 h-6 text-green-600 mb-2 opacity-80" />
                   <p className="text-xs text-gray-400 font-bold uppercase mb-0.5">Course Fee</p>
-                  <p className="font-bold text-gray-800 text-lg">₹{Number(selectedCourse.price).toLocaleString()}</p>
+                  <p className="font-bold text-gray-800 text-lg">Rs. {Number(selectedCourse.price).toLocaleString()}</p>
                 </div>
                 <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col justify-center items-center text-center">
                   <Users className="w-6 h-6 text-blue-500 mb-2 opacity-80" />

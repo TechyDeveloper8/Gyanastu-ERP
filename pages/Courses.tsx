@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '../services/api';
 import { socket } from '../services/socket';
 import { Search, Filter, Loader } from 'lucide-react';
@@ -134,10 +135,13 @@ const Courses: React.FC = () => {
                     )}
 
                     <div className="flex justify-between items-center pt-4 border-t border-gray-100 mt-auto">
-                      <span className="text-2xl font-heading font-bold text-accent">₹{(course.price || 0).toLocaleString()}</span>
-                      <button className="bg-primary hover:bg-primary/90 text-white text-sm px-4 py-2 rounded transition-colors">
+                      <span className="text-2xl font-heading font-bold text-accent">Rs. {(course.price || 0).toLocaleString()}</span>
+                      <Link 
+                        to={`/courses/${course.id || course._id}`}
+                        className="bg-primary hover:bg-primary/90 text-white text-sm px-4 py-2 rounded transition-colors"
+                      >
                         View Details
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>

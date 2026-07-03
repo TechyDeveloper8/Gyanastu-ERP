@@ -139,7 +139,7 @@ const Home: React.FC = () => {
                   <h3 className="text-xl font-heading font-bold text-primary mb-3">{course.title}</h3>
                   <p className="text-gray-600 text-sm mb-4 line-clamp-2">{course.description}</p>
                   <div className="flex justify-between items-center pt-4 border-t border-gray-100">
-                    <span className="text-primary font-bold">₹{course.price.toLocaleString()}</span>
+                    <span className="text-primary font-bold">Rs. {course.price.toLocaleString()}</span>
                     <span className="text-sm text-gray-500">{course.duration}</span>
                   </div>
                 </div>
