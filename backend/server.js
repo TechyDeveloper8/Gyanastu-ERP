@@ -114,10 +114,16 @@ const requireAuth = (req, res, next) => {
 };
 
 const requireRole = (roles) => (req, res, next) => {
-  if (!req.user || !roles.includes(req.user.role)) {
+  if (!req.user) {
     return res.status(403).json({ message: 'Access Denied: Insufficient permissions' });
   }
-  next();
+  const userRole = String(req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '');
+  const allowedRoles = roles.map(r => String(r).toUpperCase().replace(/[^A-Z]/g, ''));
+
+  if (userRole === 'SUPERADMIN' || allowedRoles.includes(userRole) || roles.includes(req.user.role)) {
+    return next();
+  }
+  return res.status(403).json({ message: 'Access Denied: Insufficient permissions' });
 };
 
 // --- API ROUTES ---
@@ -822,19 +828,25 @@ app.get('/api/batches', requireAuth, async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-app.post('/api/batches', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
+app.post('/api/batches', requireAuth, requireRole(['SUPER_ADMIN', 'FRANCHISE_ADMIN']), async (req, res) => {
   try {
-    const payload = { ...req.body, franchise: req.user.franchiseId };
+    const isSuperAdmin = (req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '') === 'SUPERADMIN';
+    const franchiseId = isSuperAdmin ? (req.body.franchiseId || req.body.franchise) : req.user.franchiseId;
+    const payload = { ...req.body, franchise: franchiseId };
     const batch = await Batch.create(payload);
     broadcast('batch_added', batch);
     res.status(201).json(batch);
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
-app.put('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
+app.put('/api/batches/:id', requireAuth, requireRole(['SUPER_ADMIN', 'FRANCHISE_ADMIN']), async (req, res) => {
   try {
+    const isSuperAdmin = (req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '') === 'SUPERADMIN';
+    const filter = isSuperAdmin
+      ? { _id: req.params.id }
+      : { _id: req.params.id, franchise: req.user.franchiseId };
     const batch = await Batch.findOneAndUpdate(
-      { _id: req.params.id, franchise: req.user.franchiseId },
+      filter,
       req.body,
       { new: true }
     );
@@ -844,9 +856,13 @@ app.put('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), async
   } catch (err) { res.status(400).json({ message: err.message }); }
 });
 
-app.delete('/api/batches/:id', requireAuth, requireRole(['FRANCHISE_ADMIN']), async (req, res) => {
+app.delete('/api/batches/:id', requireAuth, requireRole(['SUPER_ADMIN', 'FRANCHISE_ADMIN']), async (req, res) => {
   try {
-    const batch = await Batch.findOneAndDelete({ _id: req.params.id, franchise: req.user.franchiseId });
+    const isSuperAdmin = (req.user.role || '').toUpperCase().replace(/[^A-Z]/g, '') === 'SUPERADMIN';
+    const filter = isSuperAdmin
+      ? { _id: req.params.id }
+      : { _id: req.params.id, franchise: req.user.franchiseId };
+    const batch = await Batch.findOneAndDelete(filter);
     if (!batch) return res.status(404).json({ message: 'Batch not found or access denied' });
 
     // Unassign students from this batch
